@@ -30,4 +30,5 @@ docker run -it --rm \
     --volume="${HOST_XDG_RUNTIME_DIR}:${HOST_XDG_RUNTIME_DIR}:rw" \
     --user="${HOST_USER_ID}:${HOST_GROUP_ID}" \
     --volume="/home/matip/ros-gz-docker/data:/home/ubuntu/shared:rw" \
+    --workdir="/home/ubuntu" \
     ros-jazzy-gz-wayland

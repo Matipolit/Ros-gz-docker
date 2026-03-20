@@ -1,12 +1,13 @@
 # Use an official Ubuntu 24.04 base image
 FROM ubuntu:24.04
 
-# Set environment variables to non-interactive to avoid prompts during build
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Etc/UTC
-
-# Set ROS distribution
-ENV ROS_DISTRO=jazzy
+# --- Global Configuration ---
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Etc/UTC \
+    ROS_DISTRO=jazzy \
+    CC=/usr/bin/gcc-11 \
+    CXX=/usr/bin/g++-11 \
+    PM_PACKAGES_ROOT=/opt/packman
 
 # Add ROS 2 apt repository and install dependencies
 RUN apt-get update && \
@@ -44,6 +45,7 @@ RUN apt-get install -y \
     python3-pip \
     # Other common dependencies you might need
     git \
+    git-lfs \
     nano \
     vim \
     && rm -rf /var/lib/apt/lists/*
@@ -51,6 +53,7 @@ RUN apt-get install -y \
 # EVO
 
 RUN apt-get update && apt-get install -y pipx
+
 
 # Konfiguracja pipx, aby instalował narzędzia "systemowo" (dostępne dla wszystkich)
 ENV PIPX_HOME=/opt/pipx
@@ -64,10 +67,32 @@ RUN pipx install evo
 # RUN useradd -m rosuser && echo "rosuser:rosuser" | chpasswd && adduser rosuser sudo
 # USER rosuser
 # WORKDIR /home/rosuser/ros2_ws
+ 
+# Isaac Sim
+RUN apt-get install -y gcc-11 g++-11 \
+&& sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 200 \
+&& sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 200
 
-# If you created a user, ensure they can access GPU devices if not running as root
-# RUN groupadd video && usermod -a -G video rosuser
-#
+WORKDIR /opt
+
+# 1. Clone the repository
+RUN git clone https://github.com/isaac-sim/IsaacSim.git isaacsim
+
+# 2. Initialize LFS and Pull Assets
+WORKDIR /opt/isaacsim
+RUN git lfs install && \
+    git lfs pull && \
+    echo '#!/bin/bash' > tools/eula_check.sh && \
+    echo 'exit 0' >> tools/eula_check.sh && \
+    chmod +x tools/eula_check.sh && \
+    # Run the build in Release mode (headless/automated)
+    ./build.sh --release
+
+RUN chmod -R 777 /opt/isaacsim && \
+    chmod -R 777 /opt/packman
+
+RUN echo 'alias isaac-sim="/opt/isaacsim/_build/linux-x86_64/release/isaac-sim.sh"' >> /etc/bash.bashrc
+
 RUN mkdir -p /run/user/1000 && chown 1000:1000 /run/user/1000 && chmod 0700 /run/user/1000
 
 # No passowrd for sudo
