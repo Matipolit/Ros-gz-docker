@@ -27,6 +27,9 @@ docker run -it --rm \
     --env="DISPLAY=${DISPLAY}" \
     --env="QT_QPA_PLATFORM=xcb" \
     --env="XDG_RUNTIME_DIR=${HOST_XDG_RUNTIME_DIR}" \
+    --env="ROS_DISTRO=jazzy" \
+    --env="ROS_DOMAIN_ID=0" \
+    --env="ROS_LOCALHOST_ONLY=1" \
     --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
     --volume="${HOST_XDG_RUNTIME_DIR}:${HOST_XDG_RUNTIME_DIR}:rw" \
     --device=/dev/dri:/dev/dri \
