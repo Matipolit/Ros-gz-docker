@@ -1,0 +1,30 @@
+{
+    "name": "slam-evaluator-dev",
+    "build": {
+        "dockerfile": "../Dockerfile.slam_evaluator",
+        "context": ".."
+    },
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    "overrideCommand": true,
+    "mounts": [
+        "source=${localWorkspaceFolder}/data,target=/data,type=bind"
+    ],
+    "containerEnv": {
+        "PYTHONUNBUFFERED": "1"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.analysis.extraPaths": [
+                    "${workspaceFolder}/slam_evaluator"
+                ]
+            }
+        }
+    },
+    "postCreateCommand": "python -m pip list"
+}

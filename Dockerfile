@@ -55,17 +55,6 @@ RUN apt-get update && apt-get install -y \
     vim \
     && rm -rf /var/lib/apt/lists/*
 
-# EVO
-
-RUN apt-get update && apt-get install -y pipx
-
-
-# Konfiguracja pipx, aby instalował narzędzia "systemowo" (dostępne dla wszystkich)
-ENV PIPX_HOME=/opt/pipx
-ENV PIPX_BIN_DIR=/usr/local/bin
-
-RUN pipx install evo
-
 # Set up a non-root user (optional but good practice)
 # If the OSRF images create a 'ros' user, you might want to align with that.
 # For simplicity here, we'll continue as root or you can create a user.
