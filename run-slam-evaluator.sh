@@ -11,7 +11,7 @@ mkdir -p "${HOST_DATA_DIR}/reports"
 mkdir -p "${HOST_SCRIPTS_DIR}"
 
 if [ "$#" -eq 0 ]; then
-    set -- -m pip list
+    set -- python3 -m pip list
 fi
 
 docker run -it --rm \

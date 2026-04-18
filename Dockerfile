@@ -1,4 +1,3 @@
-# Use an official Ubuntu 24.04 base image
 FROM ubuntu:24.04
 
 # --- Global Configuration ---
@@ -18,13 +17,11 @@ RUN apt-get update && \
     gnupg2 \
     lsb-release \
     software-properties-common \
+    && add-apt-repository -y universe \
     && curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null \
     && apt-get update
 
-# Install ROS 2 Jazzy, Gazebo Harmonic (via ros-gz), and other useful tools
-# ros-${ROS_DISTRO}-ros-gz will pull in the correct Gazebo version (Harmonic for Jazzy)
-# and ROS 2 integration packages.
 RUN apt-get update && apt-get install -y \
     ros-${ROS_DISTRO}-desktop \
     ros-${ROS_DISTRO}-ros-gz \
@@ -48,24 +45,20 @@ RUN apt-get update && apt-get install -y \
     xterm \
     # Python for ROS 2 nodes
     python3-pip \
-    # Other common dependencies you might need
+    # Other utilities
     git \
     git-lfs \
     nano \
     vim \
     && rm -rf /var/lib/apt/lists/*
 
-# Set up a non-root user (optional but good practice)
-# If the OSRF images create a 'ros' user, you might want to align with that.
-# For simplicity here, we'll continue as root or you can create a user.
-# RUN useradd -m rosuser && echo "rosuser:rosuser" | chpasswd && adduser rosuser sudo
-# USER rosuser
-# WORKDIR /home/rosuser/ros2_ws
 
 # Isaac Sim
-RUN apt-get install -y gcc-11 g++-11 \
-    && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 200 \
-    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 200
+RUN apt-get update && \
+    apt-get install -y gcc-11 g++-11 && \
+    update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 200 && \
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 200 && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt
 
@@ -93,11 +86,12 @@ RUN mkdir -p /run/user/1000 && chown 1000:1000 /run/user/1000 && chmod 0700 /run
 # Automatically source ROS 2 for any bash sessions
 RUN echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> /etc/bash.bashrc && \
     echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> /root/.bashrc && \
-    echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> /home/ubuntu/.bashrc
+    if [ -d /home/ubuntu ]; then echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> /home/ubuntu/.bashrc; fi
 
 # No passowrd for sudo
 
-RUN echo "ubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ubuntu && \
+RUN mkdir -p /etc/sudoers.d && \
+    echo "ubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ubuntu && \
     chmod 0440 /etc/sudoers.d/ubuntu
 
 # Source ROS 2 environment
@@ -108,5 +102,9 @@ ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
 
 # Clean up
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ros-${ROS_DISTRO}-image-pipeline \
+    ros-${ROS_DISTRO}-pcl-ros && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 

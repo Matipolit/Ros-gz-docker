@@ -1,0 +1,61 @@
+FROM ros:jazzy-ros-base-noble
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    ROS_DISTRO=jazzy \
+    ROS_DOMAIN_ID=0 \
+    ROS_LOCALHOST_ONLY=1 \
+    RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-colcon-common-extensions \
+    python3-rosdep \
+    ros-jazzy-rtabmap-ros \
+    ros-jazzy-vision-opencv \
+    ros-jazzy-message-filters \
+    build-essential \
+    cmake \
+    pkg-config \
+    git \
+    vim \
+    nano \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /opt/slam_ws/src
+
+RUN printf '%s\n' '#!/usr/bin/env bash' \
+    'set -eo pipefail' \
+    '' \
+    'ORB_SLAM3_WRAPPER_REPO="${ORB_SLAM3_WRAPPER_REPO:-https://github.com/Mechazo11/ros2_orb_slam3.git}"' \
+    'ORB_SLAM3_WRAPPER_BRANCH="${ORB_SLAM3_WRAPPER_BRANCH:-jazzy}"' \
+    '' \
+    'export AMENT_TRACE_SETUP_FILES="${AMENT_TRACE_SETUP_FILES:-}"' \
+    'source /opt/ros/jazzy/setup.bash' \
+    'mkdir -p /opt/slam_ws/src' \
+    '' \
+    'if [ ! -d /opt/slam_ws/src/ros2_orb_slam3/.git ]; then' \
+    '  git clone --branch "${ORB_SLAM3_WRAPPER_BRANCH}" --depth 1 "${ORB_SLAM3_WRAPPER_REPO}" /opt/slam_ws/src/ros2_orb_slam3' \
+    'else' \
+    '  git -C /opt/slam_ws/src/ros2_orb_slam3 fetch --depth 1 origin "${ORB_SLAM3_WRAPPER_BRANCH}"' \
+    '  git -C /opt/slam_ws/src/ros2_orb_slam3 checkout "${ORB_SLAM3_WRAPPER_BRANCH}"' \
+    '  git -C /opt/slam_ws/src/ros2_orb_slam3 pull --ff-only origin "${ORB_SLAM3_WRAPPER_BRANCH}"' \
+    'fi' \
+    '' \
+    'if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then rosdep init; fi' \
+    'rosdep update' \
+    'rosdep install --from-paths /opt/slam_ws/src --ignore-src -y --rosdistro jazzy || true' \
+    '' \
+    'echo "Now build wrapper with:"' \
+    'echo "  source /opt/ros/jazzy/setup.bash && cd /opt/slam_ws && colcon build --symlink-install"' \
+    > /usr/local/bin/bootstrap-orbslam3-wrapper && chmod +x /usr/local/bin/bootstrap-orbslam3-wrapper
+
+RUN printf '%s\n' '#!/usr/bin/env bash' \
+    'set -eo pipefail' \
+    'export AMENT_TRACE_SETUP_FILES="${AMENT_TRACE_SETUP_FILES:-}"' \
+    'source /opt/ros/jazzy/setup.bash' \
+    'if [ -f /opt/slam_ws/install/setup.bash ]; then source /opt/slam_ws/install/setup.bash; fi' \
+    'exec "$@"' \
+    > /entrypoint.sh && chmod +x /entrypoint.sh
+
+WORKDIR /workspace
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["bash"]
