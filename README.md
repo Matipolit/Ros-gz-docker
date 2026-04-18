@@ -16,7 +16,7 @@ This split avoids dependency conflicts and keeps rebuild/debug cycles short.
 ./build-slam-evaluator.sh
 ```
 
-## Start simulation
+## Simulation
 
 To start with an Nvidia GPU:
 
@@ -24,11 +24,109 @@ To start with an Nvidia GPU:
 ./run-nvidia.sh
 ```
 
-## Start SLAM runtime container
+To start Isaac Sim inside the container:
 
 ```bash
-./run-slam-runtime.sh
+isaac-sim
 ```
+
+To control the robot, join the container from a new terminal and run:
+
+```bash
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+```
+
+To record a run, join the container from a new terminal and run:
+
+```bash
+ros2 bag record -o /home/ubuntu/shared/rosbags/max_x_run_y_description \
+/clock /tf /tf_static \
+/camera/color/image_raw /camera/depth/image_raw /camera/camera_info \
+/imu/data \
+/cmd_vel
+```
+
+## Generating Ground Truth
+
+### Generating a reference point cloud
+
+*Inside the simulation container*
+
+Create a PointCloud2 topic:
+
+```bash
+ros2 run depth_image_proc point_cloud_xyz_node --ros-args \
+  -r image_rect:=/camera/depth/image_raw \
+  -r camera_info:=/camera/camera_info \
+  -r points:=/camera/points
+```
+
+In another shell in the same container, export incoming `/camera/points` messages to individual `.pcd` files:
+
+```bash
+mkdir -p /home/ubuntu/shared/reports/pcd_files
+
+ros2 run pcl_ros pointcloud_to_pcd --ros-args \
+  -p prefix:=/home/ubuntu/shared/reports/pcd_files/ \
+  -p use_sim_time:=true \
+  -r input:=/camera/points
+```
+
+
+Play a recorded rosbag to register the individual point clouds:
+
+```bashbash
+ros2 bag play /home/ubuntu/shared/rosbags/max_x_run_y_description
+```
+
+After it finishes playing, you can stop all the ros nodes and the registered point clouds will be in `data/reports/pcd_files/` on the host.
+
+*Inside the evaluation container*
+
+Run the merge script:
+
+```bash
+./run-slam-evaluator.sh merge_downsample_pcd.py \
+  /data/reports/pcd_files \
+  /data/reports/map_x_run_y/ground_truth/map_merged_downsampled.ply \
+  0.05
+```
+
+The arguments for the script are as follows:
+- `input_dir`: directory containing the individual `.pcd` files
+- `output_file`: path to the output merged point cloud (can be `.ply` or `.pcd`)
+- `voxel_size`: voxel size for downsampling (e.g. 0.05 for 5cm)
+
+### Generating a reference trajectory
+
+*Inside the evaluation container*
+
+Run the extract_trajectory script:
+
+```bash
+./run-slam-evaluator.sh extract_trajectory.py \
+  /data/rosbags/max_x_run_y \
+  /data/reports/map_x_run_y/ground_truth/trajectory.csv
+```
+
+### Generating a reference topology
+
+*Inside the evaluation container*
+
+Run the extract_topology script:
+
+```bash
+./run-slam-evaluator.sh extract_topology.py \
+  /data/rosbags/max_x_run_y \
+  /data/reports/map_x_run_y/ground_truth/topology.json
+```
+
+## Running SLAM algorithms 
+
+*Inside the SLAM runtime container*
+
+### Orb-SLAM3
+
 
 Inside the container bootstrap the ORB-SLAM3 wrapper once:
 
@@ -44,9 +142,50 @@ cd /opt/slam_ws
 colcon build --symlink-install
 ```
 
-`rtabmap_ros` is installed from apt (`ros-jazzy-rtabmap-ros`) and can be launched directly with `ros2 launch ...`.
+### RTAB-Map
 
-## Start evaluator container
+Listen to appropriate topics with RTAB-Map:
+
+```bash
+ros2 launch rtabmap_launch rtabmap.launch.py \
+  rtabmap_args:="--delete_db_on_start" \
+  frame_id:=base_link \
+  rgb_topic:=/camera/color/image_raw \
+  depth_topic:=/camera/depth/image_raw \
+  camera_info_topic:=/camera/camera_info \
+  approx_sync:=true \
+  use_sim_time:=true \
+  rtabmap_viz:=false
+
+```bash
+./run-slam-runtime.sh
+```
+
+Open a new terminal and play the rosbag:
+
+```bash
+ros2 bag play /home/ubuntu/shared/rosbags/map_x_run_y_description
+```
+
+After the rosbag finishes, you can close RTAB-Map, and the resulting db will be in `/root/.ros/rtabmap.db`
+
+To extract the trajectory and point cloud:
+
+```bash
+mkdir -p /data/reports/map_x_run_y/rtab-map
+
+rtabmap-export --poses \
+  --output_dir /data/reports/map_x_run_y/rtab-map \
+  /root/.ros/rtabmap.db
+
+rtabmap-export --cloud \
+  --output_dir /data/reports/map_x_run_y/rtab-map \
+  /root/.ros/rtabmap.db
+```
+
+
+
+## Evaluating SLAM algorithms
 
 ```bash
 ./run-slam-evaluator.sh
