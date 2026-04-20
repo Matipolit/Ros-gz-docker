@@ -62,9 +62,13 @@ def extract_reference_traj(input_file_name: str, output_file_name: str):
                         ori.w,
                     )
                     if current_row_data != last_row_data:
+                        sim_time = timestamp / 1e9
+                        if hasattr(m, "header") and hasattr(m.header, "stamp"):
+                            sim_time = m.header.stamp.sec + m.header.stamp.nanosec / 1e9
+
                         writer.writerow(
                             [
-                                timestamp,
+                                sim_time,
                                 pos.x,
                                 pos.y,
                                 pos.z,

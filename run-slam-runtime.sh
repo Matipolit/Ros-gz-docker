@@ -16,6 +16,9 @@ mkdir -p "${HOST_DATA_DIR}/reports"
 mkdir -p "${HOST_DATA_DIR}/worlds"
 mkdir -p "${HOST_DATA_DIR}/rtabmap"
 
+# --- X11 Authorization ---
+xhost + > /dev/null 2>&1 || true
+
 if [ "$#" -eq 0 ]; then
     set -- bash
 fi
@@ -27,6 +30,9 @@ docker run -it --rm \
     --env "ROS_DOMAIN_ID=${ROS_DOMAIN_ID}" \
     --env "ROS_LOCALHOST_ONLY=${ROS_LOCALHOST_ONLY}" \
     --env "RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION}" \
+    --env "DISPLAY=${DISPLAY:-}" \
+    --env "QT_QPA_PLATFORM=xcb" \
+    --volume "/tmp/.X11-unix:/tmp/.X11-unix:rw" \
     --volume "${HOST_DATA_DIR}:/data:rw" \
     --volume "${HOST_DATA_DIR}:/workspace/data:rw" \
     --volume "${HOST_DATA_DIR}/rtabmap:/root/.ros:rw" \
