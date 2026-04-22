@@ -1,4 +1,9 @@
 #!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOST_DATA_DIR="${HOST_DATA_DIR:-${SCRIPT_DIR}/data}"
+IMAGE_NAME="${ISAAC_SIM_IMAGE_NAME:-isaac-sim-runner:jazzy}"
 
 # --- Configuration Variables ---
 HOST_USER_ID=$(id -u)
@@ -9,10 +14,12 @@ HOST_WAYLAND_DISPLAY="${WAYLAND_DISPLAY}"
 # --- X11 Authorization ---
 xhost + > /dev/null 2>&1
 
-mkdir -p /home/matip/ros-gz-docker/data/isaac-sim-cache/ov-data
-mkdir -p /home/matip/ros-gz-docker/data/isaac-sim-cache/ov-cache
-mkdir -p /home/matip/ros-gz-docker/data/isaac-sim-cache/warp
-mkdir -p /home/matip/ros-gz-docker/data/isaac-sim-cache/nvidia-omniverse
+mkdir -p "${HOST_DATA_DIR}/isaac-sim-cache/ov-data"
+mkdir -p "${HOST_DATA_DIR}/isaac-sim-cache/ov-cache"
+mkdir -p "${HOST_DATA_DIR}/isaac-sim-cache/warp"
+mkdir -p "${HOST_DATA_DIR}/isaac-sim-cache/nvidia-omniverse"
+mkdir -p "${HOST_DATA_DIR}/rosbags"
+mkdir -p "${HOST_DATA_DIR}/reports"
 
 # --- Docker Run Command (NVIDIA Mode) ---
 
@@ -35,10 +42,10 @@ docker run -it --rm \
     --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
     --volume="${HOST_XDG_RUNTIME_DIR}:${HOST_XDG_RUNTIME_DIR}:rw" \
     --user="${HOST_USER_ID}:${HOST_GROUP_ID}" \
-    --volume="/home/matip/ros-gz-docker/data:/home/ubuntu/shared:rw" \
-    --volume="/home/matip/ros-gz-docker/data/isaac-sim-cache/ov-data:/home/ubuntu/.local/share/ov:rw" \
-    --volume="/home/matip/ros-gz-docker/data/isaac-sim-cache/ov-cache:/home/ubuntu/.cache/ov:rw" \
-    --volume="/home/matip/ros-gz-docker/data/isaac-sim-cache/warp:/home/ubuntu/.cache/warp:rw" \
-    --volume="/home/matip/ros-gz-docker/data/isaac-sim-cache/nvidia-omniverse:/home/ubuntu/.nvidia-omniverse:rw" \
-    --workdir="/home/ubuntu" \
-    ros-jazzy-gz-wayland
+    --volume="${HOST_DATA_DIR}:/home/ubuntu/shared:rw" \
+    --volume="${HOST_DATA_DIR}/isaac-sim-cache/ov-data:/home/ubuntu/.local/share/ov:rw" \
+    --volume="${HOST_DATA_DIR}/isaac-sim-cache/ov-cache:/home/ubuntu/.cache/ov:rw" \
+    --volume="${HOST_DATA_DIR}/isaac-sim-cache/warp:/home/ubuntu/.cache/warp:rw" \
+    --volume="${HOST_DATA_DIR}/isaac-sim-cache/nvidia-omniverse:/home/ubuntu/.nvidia-omniverse:rw" \
+    --workdir="/home/ubuntu/shared" \
+    "${IMAGE_NAME}"

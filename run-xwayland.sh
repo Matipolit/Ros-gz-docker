@@ -1,4 +1,9 @@
 #!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOST_DATA_DIR="${HOST_DATA_DIR:-${SCRIPT_DIR}/data}"
+IMAGE_NAME="${ISAAC_SIM_IMAGE_NAME:-isaac-sim-runner:jazzy}"
 
 # --- Configuration Variables ---
 HOST_USER_ID=$(id -u)
@@ -13,6 +18,10 @@ else
     RENDER_GID=$(stat -c '%g' /dev/dri/card0)
 fi
 VIDEO_GID=$(stat -c '%g' $(find /dev/dri -name 'card*' | head -n 1))
+
+mkdir -p "${HOST_DATA_DIR}"
+mkdir -p "${HOST_DATA_DIR}/rosbags"
+mkdir -p "${HOST_DATA_DIR}/reports"
 
 # --- The "Nuclear" Authorization Fix ---
 # Allow all local connections. This is the only 100% reliable way 
@@ -36,5 +45,6 @@ docker run -it --rm \
     --group-add ${RENDER_GID} \
     --group-add ${VIDEO_GID} \
     --user="${HOST_USER_ID}:${HOST_GROUP_ID}" \
-    --volume="/home/matip/ros-gz-docker/data:/home/ubuntu/shared:rw" \
-    ros-jazzy-gz-wayland
+    --volume="${HOST_DATA_DIR}:/home/ubuntu/shared:rw" \
+    --workdir="/home/ubuntu/shared" \
+    "${IMAGE_NAME}"

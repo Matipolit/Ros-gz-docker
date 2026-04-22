@@ -1,1 +1,7 @@
-data/
+data/reports/
+data/rosbags/
+data/isaac-sim-cache/
+*.pyc
+__pycache__/
+venv/
+*.ply

@@ -1,4 +1,9 @@
 #!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOST_DATA_DIR="${HOST_DATA_DIR:-${SCRIPT_DIR}/data}"
+IMAGE_NAME="${ISAAC_SIM_IMAGE_NAME:-isaac-sim-runner:jazzy}"
 
 # --- Configuration Variables ---
 HOST_USER_ID=$(id -u)
@@ -23,6 +28,10 @@ VIDEO_GID=$(stat -c '%g' $(find /dev/dri -name 'card*' | head -n 1))
 echo "Detected GPU Render GID: $RENDER_GID"
 echo "Detected GPU Video GID:  $VIDEO_GID"
 
+mkdir -p "${HOST_DATA_DIR}"
+mkdir -p "${HOST_DATA_DIR}/rosbags"
+mkdir -p "${HOST_DATA_DIR}/reports"
+
 # --- X11 Authorization Fix (Just in case) ---
 # Even if using Wayland, some libraries check X11 auth. 
 # We explicitly allow the local user to connect to X11 (safe-ish for dev).
@@ -45,5 +54,6 @@ docker run -it --rm \
     --group-add ${RENDER_GID} \
     --group-add ${VIDEO_GID} \
     --user="${HOST_USER_ID}:${HOST_GROUP_ID}" \
-    --volume="/home/matip/ros-gz-docker/data:/home/ubuntu/shared:rw" \
-    ros-jazzy-gz-wayland
+    --volume="${HOST_DATA_DIR}:/home/ubuntu/shared:rw" \
+    --workdir="/home/ubuntu/shared" \
+    "${IMAGE_NAME}"
