@@ -157,9 +157,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--gt-trajectory", required=True, type=Path)
     ap.add_argument("--rtab-poses", required=True, type=Path)
-    ap.add_argument("--rtab-cloud", required=True, type=Path)
+    ap.add_argument("--rtab-cloud", required=False, type=Path)
     ap.add_argument("--out-poses", required=True, type=Path)
-    ap.add_argument("--out-cloud", required=True, type=Path)
+    ap.add_argument("--out-cloud", required=False, type=Path)
     args = ap.parse_args()
 
     gt = load_gt_csv(args.gt_trajectory)
@@ -189,14 +189,19 @@ def main() -> int:
     print(f"Wrote aligned poses: {args.out_poses}")
 
     # Transform and write cloud
-    cloud = o3d.io.read_point_cloud(str(args.rtab_cloud))
-    if len(cloud.points) == 0:
-        raise RuntimeError(f"Empty RTAB-Map cloud: {args.rtab_cloud}")
-    cloud.transform(T_align)
-    args.out_cloud.parent.mkdir(parents=True, exist_ok=True)
-    if not o3d.io.write_point_cloud(str(args.out_cloud), cloud):
-        raise RuntimeError(f"Failed to write: {args.out_cloud}")
-    print(f"Wrote aligned cloud: {args.out_cloud}  ({len(cloud.points)} pts)")
+    if args.rtab_cloud and args.out_cloud:
+        cloud = o3d.io.read_point_cloud(str(args.rtab_cloud))
+        if len(cloud.points) == 0:
+            raise RuntimeError(f"Empty RTAB-Map cloud: {args.rtab_cloud}")
+        cloud.transform(T_align)
+        args.out_cloud.parent.mkdir(parents=True, exist_ok=True)
+        if not o3d.io.write_point_cloud(str(args.out_cloud), cloud):
+            raise RuntimeError(f"Failed to write: {args.out_cloud}")
+        print(f"Wrote aligned cloud: {args.out_cloud}  ({len(cloud.points)} pts)")
+    elif args.rtab_cloud or args.out_cloud:
+        print(
+            "Warning: Both --rtab-cloud and --out-cloud must be provided to transform the point cloud."
+        )
 
     return 0
 

@@ -5,3 +5,10 @@ data/isaac-sim-cache/
 __pycache__/
 venv/
 *.ply
+*.log
+
+data/slam_ws/**
+!data/slam_ws/
+!data/slam_ws/isaac_camera.yaml
+data/rtabmap/
+
