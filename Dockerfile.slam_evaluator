@@ -36,18 +36,21 @@ RUN mkdir -p /opt/research
 RUN printf '%s\n' '#!/usr/bin/env bash' \
     'set -euo pipefail' \
     '' \
+    'git config --global url."https://github.com/".insteadOf git@github.com:' \
+    '' \
     'SPLATAM_REPO="${SPLATAM_REPO:-https://github.com/spla-tam/SplaTAM.git}"' \
     '' \
-    'mkdir -p /opt/research' \
-    'if [ ! -d /opt/research/SplaTAM/.git ]; then' \
-    '  git clone --recurse-submodules "${SPLATAM_REPO}" /opt/research/SplaTAM' \
+    'SPLATAM_DIR="/workspace/slam_evaluator/SplaTAM"' \
+    '' \
+    'if [ ! -d "${SPLATAM_DIR}/.git" ]; then' \
+    '  git clone --recurse-submodules "${SPLATAM_REPO}" "${SPLATAM_DIR}"' \
     'else' \
-    '  git -C /opt/research/SplaTAM pull --ff-only' \
-    '  git -C /opt/research/SplaTAM submodule update --init --recursive' \
+    '  git -C "${SPLATAM_DIR}" pull --ff-only' \
+    '  git -C "${SPLATAM_DIR}" submodule update --init --recursive' \
     'fi' \
     '' \
-    'echo "SplaTAM sources are in /opt/research/SplaTAM."' \
-    'echo "Next step for SplaTAM: python3 -m venv /opt/research/SplaTAM/.venv && source /opt/research/SplaTAM/.venv/bin/activate && pip install -r /opt/research/SplaTAM/venv_requirements.txt"' \
+    'echo "SplaTAM sources are in ${SPLATAM_DIR}."' \
+    'echo "Next step for SplaTAM: python3 -m venv ${SPLATAM_DIR}/.venv && source ${SPLATAM_DIR}/.venv/bin/activate && pip install -r ${SPLATAM_DIR}/venv_requirements.txt"' \
     > /usr/local/bin/bootstrap-splatam && chmod +x /usr/local/bin/bootstrap-splatam
 
 RUN ln -s /usr/local/bin/bootstrap-splatam /usr/local/bin/bootstrap-slam-packages

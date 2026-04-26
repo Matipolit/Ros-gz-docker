@@ -1,6 +1,7 @@
 data/reports/
 data/rosbags/
 data/isaac-sim-cache/
+data/splatam_dataset/
 *.pyc
 __pycache__/
 venv/
@@ -11,4 +12,3 @@ data/slam_ws/**
 !data/slam_ws/
 !data/slam_ws/isaac_camera.yaml
 data/rtabmap/
-
