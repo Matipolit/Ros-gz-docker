@@ -181,19 +181,53 @@ Run the `extract_topology` script:
 
 ### ORB-SLAM3
 
-Inside the container bootstrap the ORB-SLAM3 wrapper once:
+Start the runtime container if needed:
+
+```bash
+./run-slam-runtime.sh
+```
+
+Inside the container bootstrap ORB-SLAM3 + ROS 2 wrapper once:
 
 ```bash
 bootstrap-orbslam3-wrapper
 ```
 
-Then build the wrapper workspace:
+What this bootstrap does:
+1. Clones wrapper: `https://github.com/Matipolit/ORB_SLAM3_ROS2.git` (branch: `jazzy-noble`)  
+2. Clones core engine: `https://github.com/UZ-SLAMLab/ORB_SLAM3.git`.
+3. Applies wrapper patch script to ORB_SLAM3.
+4. Builds ORB_SLAM3 core (`build.sh`).
+5. Extracts `Vocabulary/ORBvoc.txt` if needed.
+6. Runs `rosdep install`.
+7. Builds ROS 2 package: `orbslam3`.
+
+Notes:
+- `/opt/slam_ws` is bind-mounted to host `data/slam_ws` by `run-slam-runtime.sh`, so bootstrap artifacts persist between container runs.
+- Re-running bootstrap is usually unnecessary unless you clean `data/slam_ws` or intentionally update sources.
+- If you add more packages to `/opt/slam_ws/src`, you can build the full workspace manually:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 cd /opt/slam_ws
 colcon build --symlink-install
 ```
+
+This installation only needs to be done once.
+After installing, you can run the algorithm with:
+
+```bash
+ros2 run orbslam3 rgbd /opt/slam_ws/src/ORB_SLAM3/Vocabulary/ORBvoc.txt /opt/slam_ws/isaac_camera.yaml \
+    --ros-args \
+    -r /camera/rgb:=/camera/color/image_raw \
+    -r /camera/depth:=/camera/depth/image_raw \
+    -r /camera/camera_info:=/camera/camera_info
+```
+
+And play a rosbag in another terminal.
+
+The trajectory will be output to FrameTrajectoryTUM.txt
+The sparse point cloud will be broadcasted on topic `ros2 topic hz /orb_slam3/point_cloud`
 
 ### RTAB-Map
 
@@ -259,6 +293,37 @@ To align the RTAB-Map point cloud to Ground Truth, use the script:
   --out-cloud     /data/reports/map_x_run_y/rtab/rtabmap_cloud_aligned.ply
 ```
 
+### SplaTAM
+
+*Inside the evaluation container*
+
+SplaTAM operates differently than the ROS 2 based algorithms. To run SplaTAM on a recorded rosbag (generating both the internal configuration and the `splat.ply` dense 3D Gaussian map), use the provided python runner:
+
+```bash
+# Enter the evaluator container
+./run-slam-evaluator.sh bash
+
+# Run the SplaTAM extraction and optimization
+python3 splatam/run_rosbag_splatam.py \
+  --run \
+  --delete \
+  --profile balanced \
+  --output_dir /data/reports/map_x_run_y/splatam \
+  /data/rosbags/map_x_run_y
+```
+
+After SplaTAM finishes mapping, extract the calculated trajectory into a CSV format compatible with other SLAM algorithms, by running:
+
+```bash
+python3 splatam/export_splatam_traj.py \
+  /data/rosbags/map_x_run_y \
+  /data/reports/map_x_run_y/splatam/SplaTAM_Rosbag/params.npz \
+  /data/reports/map_x_run_y/splatam/SplaTAM_Rosbag/splatam_traj.csv \
+  3
+```
+*(Note: The last argument `3` is the frame extraction stride, which matches the `balanced` profile defaults).*
+
+
 ## Evaluating SLAM algorithms
 
 ```bash
@@ -286,17 +351,17 @@ All three containers should use the same:
 
 The runtime launcher uses `--network host` for simpler DDS discovery on Linux.
 
-## Optional: override ORB-SLAM3 wrapper repository/branch
+## Optional: change ORB-SLAM3 wrapper/core repository or branch
 
-Defaults:
+`bootstrap-orbslam3-wrapper` currently uses repository/branch values hardcoded in `Dockerfile.slam_runtime`.
 
-- repo: `https://github.com/Mechazo11/ros2_orb_slam3.git`
-- branch: `jazzy`
+Current defaults are:
+- wrapper repo: `https://github.com/Matipolit/ORB_SLAM3_ROS2.git`
+- wrapper branch: `jazzy-noble`
+- core repo: `https://github.com/UZ-SLAMLab/ORB_SLAM3.git`
 
-Override in runtime container:
+To change them, edit the variables in `Dockerfile.slam_runtime`, then rebuild the runtime image:
 
 ```bash
-export ORB_SLAM3_WRAPPER_REPO=https://github.com/<owner>/<repo>.git
-export ORB_SLAM3_WRAPPER_BRANCH=<branch>
-bootstrap-orbslam3-wrapper
+./build-slam-runtime.sh
 ```

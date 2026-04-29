@@ -4,14 +4,34 @@ ENV DEBIAN_FRONTEND=noninteractive \
     ROS_DISTRO=jazzy \
     ROS_DOMAIN_ID=0 \
     ROS_LOCALHOST_ONLY=1 \
-    RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+    RMW_IMPLEMENTATION=rmw_fastrtps_cpp \
+    ORB_SLAM3_ROOT_DIR=/opt/slam_ws/src/ORB_SLAM3
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-colcon-common-extensions \
     python3-rosdep \
+    python3-numpy \
+    python3-pil \
+    python3-pip \
     ros-jazzy-rtabmap-ros \
     ros-jazzy-vision-opencv \
     ros-jazzy-message-filters \
+    ros-jazzy-sophus \
+    ros-jazzy-cv-bridge \
+    ros-jazzy-image-transport \
+    libeigen3-dev \
+    libopencv-dev \
+    libopencv-calib3d-dev \
+    libboost-all-dev \
+    libssl-dev \
+    libglew-dev \
+    libglfw3-dev \
+    libepoxy-dev \
+    libgl1-mesa-dev \
+    libgtk-3-dev \
+    wget \
+    unzip \
+    ca-certificates \
     build-essential \
     cmake \
     pkg-config \
@@ -20,39 +40,77 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nano \
     && rm -rf /var/lib/apt/lists/*
 
+RUN pip3 install --break-system-packages rosbags
+
+# ---------- Pangolin (ORB-SLAM3 viewer dependency) ----------
+RUN git clone --depth 1 https://github.com/stevenlovegrove/Pangolin.git /tmp/Pangolin && \
+    cd /tmp/Pangolin && \
+    cmake -B build -S . \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_TESTS=OFF \
+      -DBUILD_EXAMPLES=OFF \
+      -DBUILD_PANGOLIN_PYTHON=OFF \
+      -DBUILD_PANGO_PYTHON=OFF && \
+    cmake --build build -j"$(nproc)" && \
+    cmake --install build && \
+    rm -rf /tmp/Pangolin
+
+# ---------- ldconfig so libs are found at runtime ----------
+RUN ldconfig
+
 RUN mkdir -p /opt/slam_ws/src
 
 RUN printf '%s\n' '#!/usr/bin/env bash' \
     'set -eo pipefail' \
     '' \
-    'ORB_SLAM3_WRAPPER_REPO="${ORB_SLAM3_WRAPPER_REPO:-https://github.com/Mechazo11/ros2_orb_slam3.git}"' \
-    'ORB_SLAM3_WRAPPER_BRANCH="${ORB_SLAM3_WRAPPER_BRANCH:-jazzy}"' \
+    '# Adresy Twojego forka i oryginalnego silnika' \
+    'WRAPPER_REPO="https://github.com/Matipolit/ORB_SLAM3_ROS2.git"' \
+    'WRAPPER_BRANCH="jazzy-noble"' \
+    'CORE_REPO="https://github.com/UZ-SLAMLab/ORB_SLAM3.git"' \
     '' \
-    'export AMENT_TRACE_SETUP_FILES="${AMENT_TRACE_SETUP_FILES:-}"' \
     'source /opt/ros/jazzy/setup.bash' \
-    'mkdir -p /opt/slam_ws/src' \
+    'mkdir -p /opt/slam_ws/src && cd /opt/slam_ws/src' \
     '' \
-    'if [ ! -d /opt/slam_ws/src/ros2_orb_slam3/.git ]; then' \
-    '  git clone --branch "${ORB_SLAM3_WRAPPER_BRANCH}" --depth 1 "${ORB_SLAM3_WRAPPER_REPO}" /opt/slam_ws/src/ros2_orb_slam3' \
-    'else' \
-    '  git -C /opt/slam_ws/src/ros2_orb_slam3 fetch --depth 1 origin "${ORB_SLAM3_WRAPPER_BRANCH}"' \
-    '  git -C /opt/slam_ws/src/ros2_orb_slam3 checkout "${ORB_SLAM3_WRAPPER_BRANCH}"' \
-    '  git -C /opt/slam_ws/src/ros2_orb_slam3 pull --ff-only origin "${ORB_SLAM3_WRAPPER_BRANCH}"' \
+    '# 1. Pobieranie Twojego wrappera' \
+    'if [ ! -d ORB_SLAM3_ROS2 ]; then' \
+    '  git clone --branch "${WRAPPER_BRANCH}" --depth 1 "${WRAPPER_REPO}" ORB_SLAM3_ROS2' \
     'fi' \
     '' \
-    'if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then rosdep init; fi' \
-    'rosdep update' \
-    'rosdep install --from-paths /opt/slam_ws/src --ignore-src -y --rosdistro jazzy || true' \
+    '# 2. Pobieranie silnika głównego' \
+    'if [ ! -d ORB_SLAM3 ]; then' \
+    '  git clone "${CORE_REPO}" ORB_SLAM3' \
+    'fi' \
     '' \
-    'echo "Now build wrapper with:"' \
-    'echo "  source /opt/ros/jazzy/setup.bash && cd /opt/slam_ws && colcon build --symlink-install"' \
+    '# 3. Patchowanie silnika Twoim skryptem z forka' \
+    'echo "Aplikowanie łatek na silnik ORB_SLAM3..."' \
+    'chmod +x /opt/slam_ws/src/ORB_SLAM3_ROS2/patch_engine.sh' \
+    '/opt/slam_ws/src/ORB_SLAM3_ROS2/patch_engine.sh /opt/slam_ws/src/ORB_SLAM3' \
+    '' \
+    '# 4. Budowanie silnika (to potrwa najdłużej)' \
+    'echo "Kompilacja silnika ORB_SLAM3..."' \
+    'cd /opt/slam_ws/src/ORB_SLAM3 && chmod +x build.sh && ./build.sh' \
+    '' \
+    '# 5. Rozpakowanie słownika' \
+    'VOC_GZ="/opt/slam_ws/src/ORB_SLAM3/Vocabulary/ORBvoc.txt.tar.gz"' \
+    'VOC_TXT="/opt/slam_ws/src/ORB_SLAM3/Vocabulary/ORBvoc.txt"' \
+    'if [ -f "${VOC_GZ}" ] && [ ! -f "${VOC_TXT}" ]; then' \
+    '  cd /opt/slam_ws/src/ORB_SLAM3/Vocabulary && tar -xf ORBvoc.txt.tar.gz' \
+    'fi' \
+    '' \
+    '# 6. Instalacja zależności rosdep i budowanie wrappera' \
+    'cd /opt/slam_ws' \
+    'rosdep update && rosdep install --from-paths src --ignore-src -y --rosdistro jazzy || true' \
+    '' \
+    'echo "Budowanie wrappera ROS 2..."' \
+    'colcon build --symlink-install --packages-select orbslam3' \
     > /usr/local/bin/bootstrap-orbslam3-wrapper && chmod +x /usr/local/bin/bootstrap-orbslam3-wrapper
 
 RUN printf '%s\n' '#!/usr/bin/env bash' \
     'set -eo pipefail' \
-    'export AMENT_TRACE_SETUP_FILES="${AMENT_TRACE_SETUP_FILES:-}"' \
     'source /opt/ros/jazzy/setup.bash' \
     'if [ -f /opt/slam_ws/install/setup.bash ]; then source /opt/slam_ws/install/setup.bash; fi' \
+    'export ORB_SLAM3_ROOT_DIR="/opt/slam_ws/src/ORB_SLAM3"' \
+    'export LD_LIBRARY_PATH="/opt/slam_ws/src/ORB_SLAM3/lib:$LD_LIBRARY_PATH"' \
     'exec "$@"' \
     > /entrypoint.sh && chmod +x /entrypoint.sh
 

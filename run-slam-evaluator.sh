@@ -14,8 +14,19 @@ if [ "$#" -eq 0 ]; then
     set -- python3 -m pip list
 fi
 
+DOCKER_ARGS=()
+if command -v nvidia-smi >/dev/null 2>&1; then
+    DOCKER_ARGS+=(
+        --runtime=nvidia
+        --gpus all
+        --env="NVIDIA_VISIBLE_DEVICES=all"
+        --env="NVIDIA_DRIVER_CAPABILITIES=all"
+    )
+fi
+
 docker run -it --rm \
     --name slam-evaluator-container \
+    "${DOCKER_ARGS[@]}" \
     --volume="${HOST_DATA_DIR}:/data:rw" \
     --volume="${HOST_SCRIPTS_DIR}:/workspace/slam_evaluator:rw" \
     --workdir="/workspace/slam_evaluator" \
