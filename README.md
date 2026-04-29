@@ -293,6 +293,37 @@ To align the RTAB-Map point cloud to Ground Truth, use the script:
   --out-cloud     /data/reports/map_x_run_y/rtab/rtabmap_cloud_aligned.ply
 ```
 
+### SplaTAM
+
+*Inside the evaluation container*
+
+SplaTAM operates differently than the ROS 2 based algorithms. To run SplaTAM on a recorded rosbag (generating both the internal configuration and the `splat.ply` dense 3D Gaussian map), use the provided python runner:
+
+```bash
+# Enter the evaluator container
+./run-slam-evaluator.sh bash
+
+# Run the SplaTAM extraction and optimization
+python3 splatam/run_rosbag_splatam.py \
+  --run \
+  --delete \
+  --profile balanced \
+  --output_dir /data/reports/map_x_run_y/splatam \
+  /data/rosbags/map_x_run_y
+```
+
+After SplaTAM finishes mapping, extract the calculated trajectory into a CSV format compatible with other SLAM algorithms, by running:
+
+```bash
+python3 splatam/export_splatam_traj.py \
+  /data/rosbags/map_x_run_y \
+  /data/reports/map_x_run_y/splatam/SplaTAM_Rosbag/params.npz \
+  /data/reports/map_x_run_y/splatam/SplaTAM_Rosbag/splatam_traj.csv \
+  3
+```
+*(Note: The last argument `3` is the frame extraction stride, which matches the `balanced` profile defaults).*
+
+
 ## Evaluating SLAM algorithms
 
 ```bash

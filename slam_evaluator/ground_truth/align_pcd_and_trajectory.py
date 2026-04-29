@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Align RTAB-Map trajectory and point cloud into the Ground Truth world frame.
+"""Align SLAM trajectory and point cloud into the Ground Truth world frame.
 
-Strategy: rigid SE(3) alignment anchored on the first RTAB-Map pose.
-    T_align = T_gt(t0) * T_rtab(t0)^-1
-Then apply T_align to every RTAB-Map pose and to the RTAB-Map point cloud.
+Strategy: rigid SE(3) alignment anchored on the first SLAM pose.
+    T_align = T_gt(t0) * T_slam(t0)^-1
+Then apply T_align to every SLAM pose and to the SLAM point cloud.
 
-This preserves RTAB-Map's internal shape/drift (no scaling, no per-pose fitting),
+This preserves SLAM's internal shape/drift (no scaling, no per-pose fitting),
 it only re-expresses the output in the GT world frame so visual overlay and
 metric computation become straightforward.
 """
@@ -97,21 +97,24 @@ def load_gt_csv(path: Path) -> list[tuple[float, np.ndarray]]:
     return rows
 
 
-def load_rtabmap_poses(path: Path) -> list[tuple[float, int, np.ndarray]]:
-    """Return list of (timestamp, id, 4x4 pose) from RTAB-Map poses.txt."""
+def load_slam_poses(path: Path) -> list[tuple[float, int, np.ndarray]]:
+    """Return list of (timestamp, id, 4x4 pose) from SLAM poses.txt or CSV."""
     out = []
     with open(path, "r") as f:
         for line in f:
             line = line.strip()
-            if not line or line.startswith("#"):
+            if not line or line.startswith("#") or line.startswith("t"):
                 continue
-            parts = line.split()
+            parts = line.split(',') if ',' in line else line.split()
             if len(parts) < 8:
                 continue
-            t = float(parts[0])
-            x, y, z = map(float, parts[1:4])
-            qx, qy, qz, qw = map(float, parts[4:8])
-            pid = int(parts[8]) if len(parts) >= 9 else -1
+            try:
+                t = float(parts[0])
+                x, y, z = map(float, parts[1:4])
+                qx, qy, qz, qw = map(float, parts[4:8])
+                pid = int(parts[8]) if len(parts) >= 9 else -1
+            except ValueError:
+                continue
             out.append(
                 (t, pid, make_se3(np.array([x, y, z]), quat_to_rot(qx, qy, qz, qw)))
             )
@@ -156,21 +159,21 @@ def interpolate_gt_pose(t: float, gt: list[tuple[float, np.ndarray]]) -> np.ndar
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--gt-trajectory", required=True, type=Path)
-    ap.add_argument("--rtab-poses", required=True, type=Path)
-    ap.add_argument("--rtab-cloud", required=False, type=Path)
+    ap.add_argument("--slam-poses", required=True, type=Path)
+    ap.add_argument("--slam-cloud", required=False, type=Path)
     ap.add_argument("--out-poses", required=True, type=Path)
     ap.add_argument("--out-cloud", required=False, type=Path)
     args = ap.parse_args()
 
     gt = load_gt_csv(args.gt_trajectory)
-    rtab = load_rtabmap_poses(args.rtab_poses)
-    if not gt or not rtab:
-        raise RuntimeError("Empty GT or RTAB-Map trajectory.")
+    slam_poses = load_slam_poses(args.slam_poses)
+    if not gt or not slam_poses:
+        raise RuntimeError("Empty GT or SLAM trajectory.")
 
-    t0, _, T_rtab0 = rtab[0]
+    t0, _, T_slam0 = slam_poses[0]
     T_gt0 = interpolate_gt_pose(t0, gt)
 
-    T_align = T_gt0 @ np.linalg.inv(T_rtab0)
+    T_align = T_gt0 @ np.linalg.inv(T_slam0)
     print(f"Anchor timestamp: {t0:.6f}")
     print(f"Alignment translation: {T_align[:3, 3]}")
     print(f"Alignment rotation:\n{T_align[:3, :3]}")
@@ -179,7 +182,7 @@ def main() -> int:
     args.out_poses.parent.mkdir(parents=True, exist_ok=True)
     with open(args.out_poses, "w") as f:
         f.write("#timestamp x y z qx qy qz qw id\n")
-        for t, pid, T in rtab:
+        for t, pid, T in slam_poses:
             Ta = T_align @ T
             x, y, z = Ta[:3, 3]
             qx, qy, qz, qw = rot_to_quat(Ta[:3, :3])
@@ -189,18 +192,18 @@ def main() -> int:
     print(f"Wrote aligned poses: {args.out_poses}")
 
     # Transform and write cloud
-    if args.rtab_cloud and args.out_cloud:
-        cloud = o3d.io.read_point_cloud(str(args.rtab_cloud))
+    if args.slam_cloud and args.out_cloud:
+        cloud = o3d.io.read_point_cloud(str(args.slam_cloud))
         if len(cloud.points) == 0:
-            raise RuntimeError(f"Empty RTAB-Map cloud: {args.rtab_cloud}")
+            raise RuntimeError(f"Empty SLAM cloud: {args.slam_cloud}")
         cloud.transform(T_align)
         args.out_cloud.parent.mkdir(parents=True, exist_ok=True)
         if not o3d.io.write_point_cloud(str(args.out_cloud), cloud):
             raise RuntimeError(f"Failed to write: {args.out_cloud}")
         print(f"Wrote aligned cloud: {args.out_cloud}  ({len(cloud.points)} pts)")
-    elif args.rtab_cloud or args.out_cloud:
+    elif args.slam_cloud or args.out_cloud:
         print(
-            "Warning: Both --rtab-cloud and --out-cloud must be provided to transform the point cloud."
+            "Warning: Both --slam-cloud and --out-cloud must be provided to transform the point cloud."
         )
 
     return 0
