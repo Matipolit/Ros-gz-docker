@@ -163,6 +163,9 @@ def main() -> int:
     ap.add_argument("--slam-cloud", required=False, type=Path)
     ap.add_argument("--out-poses", required=True, type=Path)
     ap.add_argument("--out-cloud", required=False, type=Path)
+    ap.add_argument("--align-icp", action="store_true", help="Refine alignment using ICP")
+    ap.add_argument("--gt-cloud", required=False, type=Path, help="Ground Truth parameter for ICP")
+    ap.add_argument("--icp-threshold", type=float, default=0.2, help="Distance threshold for ICP refinement")
     args = ap.parse_args()
 
     gt = load_gt_csv(args.gt_trajectory)
@@ -175,8 +178,36 @@ def main() -> int:
 
     T_align = T_gt0 @ np.linalg.inv(T_slam0)
     print(f"Anchor timestamp: {t0:.6f}")
-    print(f"Alignment translation: {T_align[:3, 3]}")
-    print(f"Alignment rotation:\n{T_align[:3, :3]}")
+    print(f"Initial alignment translation: {T_align[:3, 3]}")
+    print(f"Initial alignment rotation:\n{T_align[:3, :3]}")
+
+    cloud = None
+    if args.align_icp:
+        if not args.gt_cloud or not args.slam_cloud:
+            raise RuntimeError("--gt-cloud and --slam-cloud are required for ICP alignment.")
+            
+        print("Loading clouds for ICP refinement...")
+        cloud = o3d.io.read_point_cloud(str(args.slam_cloud))
+        gt_cloud = o3d.io.read_point_cloud(str(args.gt_cloud))
+        
+        if len(cloud.points) == 0 or len(gt_cloud.points) == 0:
+            raise RuntimeError("One of the clouds is empty. Cannot perform ICP.")
+            
+        print(f"Applying initial trajectory alignment to SLAM cloud before ICP...")
+        cloud.transform(T_align)
+        
+        print(f"Running ICP (threshold={args.icp_threshold})...")
+        icp_result = o3d.pipelines.registration.registration_icp(
+            cloud, gt_cloud, args.icp_threshold, np.eye(4),
+            o3d.pipelines.registration.TransformationEstimationPointToPoint()
+        )
+        
+        T_icp = icp_result.transformation
+        print(f"ICP fitness: {icp_result.fitness:.6f}, inlier_rmse: {icp_result.inlier_rmse:.6f}")
+        print(f"ICP refinement translation: {T_icp[:3, 3]}")
+        
+        cloud.transform(T_icp)
+        T_align = T_icp @ T_align
 
     # Transform and write poses
     args.out_poses.parent.mkdir(parents=True, exist_ok=True)
@@ -193,10 +224,11 @@ def main() -> int:
 
     # Transform and write cloud
     if args.slam_cloud and args.out_cloud:
-        cloud = o3d.io.read_point_cloud(str(args.slam_cloud))
-        if len(cloud.points) == 0:
-            raise RuntimeError(f"Empty SLAM cloud: {args.slam_cloud}")
-        cloud.transform(T_align)
+        if cloud is None:
+            cloud = o3d.io.read_point_cloud(str(args.slam_cloud))
+            if len(cloud.points) == 0:
+                raise RuntimeError(f"Empty SLAM cloud: {args.slam_cloud}")
+            cloud.transform(T_align)
         args.out_cloud.parent.mkdir(parents=True, exist_ok=True)
         if not o3d.io.write_point_cloud(str(args.out_cloud), cloud):
             raise RuntimeError(f"Failed to write: {args.out_cloud}")

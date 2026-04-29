@@ -111,7 +111,7 @@ def extract_topology(
             ):
                 continue
 
-            edges.append({"source": i, "target": j, "weight": float(dist_ij)})
+            edges.append({"from_id": i, "to_id": j, "weight": float(dist_ij)})
 
     topo_data = {"nodes": [], "edges": edges}
 

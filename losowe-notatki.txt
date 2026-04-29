@@ -1,0 +1,7 @@
+Przy mierzeniu grafów, klasyczne metryki skupiają się na punktowej dokładności trajektorii, i wewnętrznej niepewności.
+Pozostają całkowicie ślepe na błędy strukturalne takie jak błędne łączenie i nakładanie się pomieszczeń na mapie.
+
+Aby temu zaradzić, wprowadzono metrykję PGTI (Pose-Graph Topological Integrity). 
+W odróżnieniu od klasycznych metod pozwala ona na bezpośrednie zmierzenie globalnych niespójności topologicznych między wygenerowanym grafem pozy a rzeczywistą przestrzenią nawigacyjną otoczenia.
+
+Źródło: BDGS-SLAM: A Probabilistic 3D Gaussian Splatting Framework for Robust SLAM in Dynamic Environments https://www.mdpi.com/1424-8220/25/21/6641 

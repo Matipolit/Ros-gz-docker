@@ -227,7 +227,7 @@ ros2 run orbslam3 rgbd /opt/slam_ws/src/ORB_SLAM3/Vocabulary/ORBvoc.txt /opt/sla
 And play a rosbag in another terminal.
 
 The trajectory will be output to FrameTrajectoryTUM.txt
-The sparse point cloud will be broadcasted on topic `ros2 topic hz /orb_slam3/point_cloud`
+The sparse point cloud will be output as well.
 
 ### RTAB-Map
 

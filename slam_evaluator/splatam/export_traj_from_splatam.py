@@ -41,16 +41,12 @@ def export_traj(bag_path, npz_path, output_csv, color_topic, depth_topic, stride
 
     print(f"Total synced frames in bag: {len(synced_pairs_ts)}")
     
-    # SplaTAM uses frames based on stride.
-    # Start=0, end=-1, stride=stride
-    # (this matches realsense dataset load logic if start=0, end=-1)
+    # Get timestamps using stride
     used_timestamps = synced_pairs_ts[0::stride]
     
-    # Load params
+    # Load SplaTAM params
     params = np.load(npz_path)
-    # Shape: (1, 4, num_frames)
     w2c_rots = params['cam_unnorm_rots'][0] 
-    # Shape: (1, 3, num_frames)
     w2c_trans = params['cam_trans'][0]
     
     num_frames = w2c_rots.shape[-1]
@@ -63,31 +59,28 @@ def export_traj(bag_path, npz_path, output_csv, color_topic, depth_topic, stride
         for i in range(num_frames):
             ts = used_timestamps[i]
             
-            # W2C quaternion: (w, x, y, z) typically in PyTorch3d, wait.
-            # Let's check w2c_rots format. PyTorch3D standard is (w, x, y, z) or SplaTAM uses (w, x, y, z)?
+            # Normalize W2C quaternion
             rq = w2c_rots[:, i]
-            # normalize
             rq = rq / np.linalg.norm(rq)
             w, x, y, z = rq
             
-            # R of W2C
+            # W2C pose
             rot_w2c = Rotation.from_quat([x, y, z, w])
-            # T of W2C
             t_w2c = w2c_trans[:, i]
             
-            # Convert to C2W (optical frame pose in SplaTAM world)
+            # Convert to C2W (optical frame pose)
             rot_c2w = rot_w2c.inv()
             t_c2w = -rot_c2w.apply(t_w2c)
             
-            # T_base_opt from README.md: 0.1 0.0 0.15 -0.5 0.5 -0.5 0.5
+            # Base to optical transform
             rot_base_opt = Rotation.from_quat([-0.5, 0.5, -0.5, 0.5])
             t_base_opt = np.array([0.1, 0.0, 0.15])
             
-            # T_opt_base = T_base_opt^-1
+            # Optical to base transform
             rot_opt_base = rot_base_opt.inv()
             t_opt_base = -rot_opt_base.apply(t_base_opt)
             
-            # T_world_base = T_world_opt * T_opt_base
+            # Calculate world to base transform
             rot_world_base = rot_c2w * rot_opt_base
             t_world_base = t_c2w + rot_c2w.apply(t_opt_base)
             
