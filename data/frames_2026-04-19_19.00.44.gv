@@ -1,0 +1,10 @@
+digraph G {
+"root" -> "base_link"[label=" Broadcaster: default_authority\nAverage rate: 30.149\nBuffer length: 6.7\nMost recent transform: 10.266667\nOldest transform: 3.566667\n"];
+"base_link" -> "robot_rgbd_camera_new"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"base_link" -> "imu_frame"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"robot_rgbd_camera_new" -> "camera_optical_frame"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1776625244.4549477"[ shape=plaintext ] ;
+}->"root";
+}

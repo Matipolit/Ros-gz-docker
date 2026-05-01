@@ -1,0 +1,4 @@
+Cloud,Chamfer_Distance_m,F_score_tau,Precision,Recall,Accuracy_m,Completeness_m,Hausdorff_Distance_m,Absolute_Mapping_Error_RMSE_m,AWD,SCS
+cloud-aligned.ply,0.03299,0.03207,0.10742,0.01885,0.0307,0.03529,1017.19238,0.03242,0.1056,0.02475
+cloud-aligned.ply,0.02663,0.29921,0.21063,0.5164,0.02573,0.02752,36.83065,0.02797,0.06086,0.01779
+rtabmap_cloud_aligned.ply,0.0213,0.59192,0.92924,0.43428,0.02356,0.01903,3.97312,0.02542,0.04835,0.01518

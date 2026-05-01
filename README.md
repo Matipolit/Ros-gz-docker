@@ -175,25 +175,93 @@ Run the `extract_topology` script:
   /data/reports/map_x_run_y/ground_truth/topology.json
 ```
 
+## Point Cloud Processing
+
+*Inside the evaluation container*
+
+To ensure fair benchmarking and identical metric evaluation volumes, you can clip and downsample point clouds.
+
+### Clipping point clouds
+
+The `clip_pcd.py` script allows clipping by an Axis-Aligned Bounding Box (AABB), radial distance, or a trajectory tube (highly recommended for evaluating only the navigable space based on the ground truth path).
+
+```bash
+./run-slam-evaluator.sh python3 process/clip_pcd.py \
+  /data/reports/map_x_run_y/rtab/rtabmap_cloud_aligned.ply \
+  /data/reports/map_x_run_y/rtab/rtabmap_cloud_clipped.ply \
+  --trajectory /data/reports/map_x_run_y/ground_truth/traj.csv \
+  --tube-radius 5.0
+```
+
+Other available arguments include:
+- `--trajectory-bbox-margin`: define an automatic ROI bounding box around the trajectory with the given margin.
+- `--min-range` / `--max-range`: keep points within a distance from the origin.
+- `--crop-[x/y/z]-min` / `--crop-[x/y/z]-max`: define an ROI bounding box.
+
+### Voxelizing point clouds
+
+The `voxelize_pcd.py` script downsamples a point cloud to a uniform voxel grid.
+
+```bash
+./run-slam-evaluator.sh python3 process/voxelize_pcd.py \
+  /data/reports/map_x_run_y/rtab/rtabmap_cloud_clipped.ply \
+  /data/reports/map_x_run_y/rtab/rtabmap_cloud_voxelized.ply \
+  0.05
+```
+
 ## Running SLAM algorithms
 
 *Inside the SLAM runtime container*
 
 ### ORB-SLAM3
 
-Inside the container bootstrap the ORB-SLAM3 wrapper once:
+Start the runtime container if needed:
+
+```bash
+./run-slam-runtime.sh
+```
+
+Inside the container bootstrap ORB-SLAM3 + ROS 2 wrapper once:
 
 ```bash
 bootstrap-orbslam3-wrapper
 ```
 
-Then build the wrapper workspace:
+What this bootstrap does:
+1. Clones wrapper: `https://github.com/Matipolit/ORB_SLAM3_ROS2.git` (branch: `jazzy-noble`)  
+2. Clones core engine: `https://github.com/UZ-SLAMLab/ORB_SLAM3.git`.
+3. Applies wrapper patch script to ORB_SLAM3.
+4. Builds ORB_SLAM3 core (`build.sh`).
+5. Extracts `Vocabulary/ORBvoc.txt` if needed.
+6. Runs `rosdep install`.
+7. Builds ROS 2 package: `orbslam3`.
+
+Notes:
+- `/opt/slam_ws` is bind-mounted to host `data/slam_ws` by `run-slam-runtime.sh`, so bootstrap artifacts persist between container runs.
+- Re-running bootstrap is usually unnecessary unless you clean `data/slam_ws` or intentionally update sources.
+- If you add more packages to `/opt/slam_ws/src`, you can build the full workspace manually:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 cd /opt/slam_ws
 colcon build --symlink-install
 ```
+
+This installation only needs to be done once.
+After installing, you can run the algorithm with:
+
+```bash
+ros2 run orbslam3 rgbd /opt/slam_ws/src/ORB_SLAM3/Vocabulary/ORBvoc.txt /opt/slam_ws/isaac_camera.yaml \
+    --ros-args \
+    -r /camera/rgb:=/camera/color/image_raw \
+    -r /camera/depth:=/camera/depth/image_raw \
+    -r /camera/camera_info:=/camera/camera_info
+```
+
+And play a rosbag in another terminal.
+
+The trajectory will be output to FrameTrajectoryTUM.txt
+The sparse point cloud will be output as well.
 
 ### RTAB-Map
 
@@ -259,6 +327,37 @@ To align the RTAB-Map point cloud to Ground Truth, use the script:
   --out-cloud     /data/reports/map_x_run_y/rtab/rtabmap_cloud_aligned.ply
 ```
 
+### SplaTAM
+
+*Inside the evaluation container*
+
+SplaTAM operates differently than the ROS 2 based algorithms. To run SplaTAM on a recorded rosbag (generating both the internal configuration and the `splat.ply` dense 3D Gaussian map), use the provided python runner:
+
+```bash
+# Enter the evaluator container
+./run-slam-evaluator.sh bash
+
+# Run the SplaTAM extraction and optimization
+python3 splatam/run_rosbag_splatam.py \
+  --run \
+  --delete \
+  --profile balanced \
+  --output_dir /data/reports/map_x_run_y/splatam \
+  /data/rosbags/map_x_run_y
+```
+
+After SplaTAM finishes mapping, extract the calculated trajectory into a CSV format compatible with other SLAM algorithms, by running:
+
+```bash
+python3 splatam/export_splatam_traj.py \
+  /data/rosbags/map_x_run_y \
+  /data/reports/map_x_run_y/splatam/SplaTAM_Rosbag/params.npz \
+  /data/reports/map_x_run_y/splatam/SplaTAM_Rosbag/splatam_traj.csv \
+  3
+```
+*(Note: The last argument `3` is the frame extraction stride, which matches the `balanced` profile defaults).*
+
+
 ## Evaluating SLAM algorithms
 
 ```bash
@@ -277,6 +376,52 @@ pip install -r /opt/research/SplaTAM/venv_requirements.txt
 Evaluator image intentionally does not include ROS packages. It is Python-only for
 SplaTAM and analysis tools.
 
+## Navigation Utility Benchmarking
+
+This project includes tools to benchmark the utility of generated maps for navigation, specifically using Nav2 in ROS 2.
+
+### 1. Map Conversion (Point Cloud to 2D Grid)
+
+First, convert a generated map (e.g., from RTAB-Map or Ground Truth) into a standard 2D Occupancy Grid (`.yaml` and `.pgm`) consumed by Nav2.
+
+```bash
+./run-slam-evaluator.sh python3 process/pcd_to_grid.py \
+  /data/reports/map_x_run_y/rtab/rtabmap_cloud.ply \
+  /data/reports/map_x_run_y/rtab/map_2d
+```
+
+This will output `map_2d.pgm` and `map_2d.yaml`.
+
+### 2. Nav2 Simulation Testing
+
+You can use the `evaluate_nav2.py` script in the `slam_runtime` container to launch a navigation commander that runs tests on the generated maps.
+
+**Important:** Because this tests actual localization (AMCL) and kidnap recovery, **you must have the robot running in Isaac Sim** to provide sensor data and odometry (`odom` -> `base_link`). AMCL also requires a 2D `/scan` topic; if your robot only outputs depth/pointclouds, you will need to run a `pointcloud_to_laserscan` node.
+
+```bash
+# Inside the slam_runtime container (ensure Isaac Sim is running in the background)
+ros2 launch nav2_bringup bringup_launch.py map:=/data/reports/map_x_run_y/rtab/map_2d.yaml use_sim_time:=True
+```
+
+In another terminal, run the evaluation script:
+
+```bash
+# Inside the slam_runtime container
+python3 /workspace/slam_evaluator/metrics/evaluate_nav2.py \
+  --output /data/reports/map_x_run_y/nav2_metrics.csv
+```
+
+### 3. Cost Grid MSE Evaluation
+
+To evaluate the structural usability of a map without simulating the full Nav2 stack, you can compute the Mean Squared Error (MSE) of the optimal path costs (Cost Grid) between two 2D grids (e.g., Ground Truth vs SLAM Map).
+
+```bash
+./run-slam-evaluator.sh python3 metrics/cost_grid_mse.py \
+  /data/reports/map_x_run_y/gt_map_2d.yaml \
+  /data/reports/map_x_run_y/rtab/map_2d.yaml \
+  --goal_x 5.0 --goal_y 0.0
+```
+
 ## ROS networking notes
 
 All three containers should use the same:
@@ -286,17 +431,17 @@ All three containers should use the same:
 
 The runtime launcher uses `--network host` for simpler DDS discovery on Linux.
 
-## Optional: override ORB-SLAM3 wrapper repository/branch
+## Optional: change ORB-SLAM3 wrapper/core repository or branch
 
-Defaults:
+`bootstrap-orbslam3-wrapper` currently uses repository/branch values hardcoded in `Dockerfile.slam_runtime`.
 
-- repo: `https://github.com/Mechazo11/ros2_orb_slam3.git`
-- branch: `jazzy`
+Current defaults are:
+- wrapper repo: `https://github.com/Matipolit/ORB_SLAM3_ROS2.git`
+- wrapper branch: `jazzy-noble`
+- core repo: `https://github.com/UZ-SLAMLab/ORB_SLAM3.git`
 
-Override in runtime container:
+To change them, edit the variables in `Dockerfile.slam_runtime`, then rebuild the runtime image:
 
 ```bash
-export ORB_SLAM3_WRAPPER_REPO=https://github.com/<owner>/<repo>.git
-export ORB_SLAM3_WRAPPER_BRANCH=<branch>
-bootstrap-orbslam3-wrapper
+./build-slam-runtime.sh
 ```

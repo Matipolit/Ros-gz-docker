@@ -1,12 +1,16 @@
-FROM python:3.12-slim
+FROM nvidia/cuda:12.8.0-devel-ubuntu22.04
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_ROOT_USER_ACTION=ignore \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    CUDA_HOME=/usr/local/cuda \
+    TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0;12.0"
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common && \
+    add-apt-repository ppa:deadsnakes/ppa -y && \
+    apt-get update && apt-get install -y --no-install-recommends \
     git \
     build-essential \
     cmake \
@@ -14,42 +18,48 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Fix SSH cloning in submodules
+RUN git config --global url."https://github.com/".insteadOf git@github.com:
 
-RUN python -m pip install --upgrade pip && \
-    python -m pip install \
+# Set up virtual environment
+RUN python3.12 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install pip and core requirements
+RUN pip install --upgrade pip setuptools wheel ninja && \
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+
+# Install other ROS/data dependencies
+RUN pip install \
     evo \
     open3d \
     trimesh \
-    numpy \
-    rosbags && \
-    python -m pip install \
-    torch \
-    torchvision \
-    torchaudio \
-    --index-url https://download.pytorch.org/whl/cpu
+    "numpy<2.0.0" \
+    rosbags \
+    "opencv-python==4.9.0.80"
 
-RUN mkdir -p /opt/research
+# Clone SplaTAM
+WORKDIR /opt/SplaTAM
+RUN git clone --recurse-submodules https://github.com/spla-tam/SplaTAM.git .
 
+# Install SplaTAM dependencies (no build isolation for diff-gaussian-rasterization)
+RUN pip install --no-build-isolation -r venv_requirements.txt
+
+# Reset workdir for container startup
+WORKDIR /workspace/slam_evaluator
+
+# Legacy bootstrap script just as an informative stub
 RUN printf '%s\n' '#!/usr/bin/env bash' \
-    'set -euo pipefail' \
-    '' \
-    'SPLATAM_REPO="${SPLATAM_REPO:-https://github.com/spla-tam/SplaTAM.git}"' \
-    '' \
-    'mkdir -p /opt/research' \
-    'if [ ! -d /opt/research/SplaTAM/.git ]; then' \
-    '  git clone --recurse-submodules "${SPLATAM_REPO}" /opt/research/SplaTAM' \
-    'else' \
-    '  git -C /opt/research/SplaTAM pull --ff-only' \
-    '  git -C /opt/research/SplaTAM submodule update --init --recursive' \
-    'fi' \
-    '' \
-    'echo "SplaTAM sources are in /opt/research/SplaTAM."' \
-    'echo "Next step for SplaTAM: python3 -m venv /opt/research/SplaTAM/.venv && source /opt/research/SplaTAM/.venv/bin/activate && pip install -r /opt/research/SplaTAM/venv_requirements.txt"' \
-    > /usr/local/bin/bootstrap-splatam && chmod +x /usr/local/bin/bootstrap-splatam
+    'echo "SplaTAM is now fully built into the image at /opt/SplaTAM!"' \
+    'echo "Virtual environment is activated by default."' \
+    'echo "You can run e.g.: python /opt/SplaTAM/scripts/splatam.py ..."' \
+    > /usr/local/bin/bootstrap-splatam && chmod +x /usr/local/bin/bootstrap-splatam && \
+    ln -s /usr/local/bin/bootstrap-splatam /usr/local/bin/bootstrap-slam-packages
 
-RUN ln -s /usr/local/bin/bootstrap-splatam /usr/local/bin/bootstrap-slam-packages
-
-CMD ["python3", "--version"]
+CMD ["bash"]
