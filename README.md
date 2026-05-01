@@ -175,6 +175,40 @@ Run the `extract_topology` script:
   /data/reports/map_x_run_y/ground_truth/topology.json
 ```
 
+## Point Cloud Processing
+
+*Inside the evaluation container*
+
+To ensure fair benchmarking and identical metric evaluation volumes, you can clip and downsample point clouds.
+
+### Clipping point clouds
+
+The `clip_pcd.py` script allows clipping by an Axis-Aligned Bounding Box (AABB), radial distance, or a trajectory tube (highly recommended for evaluating only the navigable space based on the ground truth path).
+
+```bash
+./run-slam-evaluator.sh python3 process/clip_pcd.py \
+  /data/reports/map_x_run_y/rtab/rtabmap_cloud_aligned.ply \
+  /data/reports/map_x_run_y/rtab/rtabmap_cloud_clipped.ply \
+  --trajectory /data/reports/map_x_run_y/ground_truth/traj.csv \
+  --tube-radius 5.0
+```
+
+Other available arguments include:
+- `--trajectory-bbox-margin`: define an automatic ROI bounding box around the trajectory with the given margin.
+- `--min-range` / `--max-range`: keep points within a distance from the origin.
+- `--crop-[x/y/z]-min` / `--crop-[x/y/z]-max`: define an ROI bounding box.
+
+### Voxelizing point clouds
+
+The `voxelize_pcd.py` script downsamples a point cloud to a uniform voxel grid.
+
+```bash
+./run-slam-evaluator.sh python3 process/voxelize_pcd.py \
+  /data/reports/map_x_run_y/rtab/rtabmap_cloud_clipped.ply \
+  /data/reports/map_x_run_y/rtab/rtabmap_cloud_voxelized.ply \
+  0.05
+```
+
 ## Running SLAM algorithms
 
 *Inside the SLAM runtime container*
@@ -341,6 +375,52 @@ pip install -r /opt/research/SplaTAM/venv_requirements.txt
 
 Evaluator image intentionally does not include ROS packages. It is Python-only for
 SplaTAM and analysis tools.
+
+## Navigation Utility Benchmarking
+
+This project includes tools to benchmark the utility of generated maps for navigation, specifically using Nav2 in ROS 2.
+
+### 1. Map Conversion (Point Cloud to 2D Grid)
+
+First, convert a generated map (e.g., from RTAB-Map or Ground Truth) into a standard 2D Occupancy Grid (`.yaml` and `.pgm`) consumed by Nav2.
+
+```bash
+./run-slam-evaluator.sh python3 process/pcd_to_grid.py \
+  /data/reports/map_x_run_y/rtab/rtabmap_cloud.ply \
+  /data/reports/map_x_run_y/rtab/map_2d
+```
+
+This will output `map_2d.pgm` and `map_2d.yaml`.
+
+### 2. Nav2 Simulation Testing
+
+You can use the `evaluate_nav2.py` script in the `slam_runtime` container to launch a navigation commander that runs tests on the generated maps.
+
+**Important:** Because this tests actual localization (AMCL) and kidnap recovery, **you must have the robot running in Isaac Sim** to provide sensor data and odometry (`odom` -> `base_link`). AMCL also requires a 2D `/scan` topic; if your robot only outputs depth/pointclouds, you will need to run a `pointcloud_to_laserscan` node.
+
+```bash
+# Inside the slam_runtime container (ensure Isaac Sim is running in the background)
+ros2 launch nav2_bringup bringup_launch.py map:=/data/reports/map_x_run_y/rtab/map_2d.yaml use_sim_time:=True
+```
+
+In another terminal, run the evaluation script:
+
+```bash
+# Inside the slam_runtime container
+python3 /workspace/slam_evaluator/metrics/evaluate_nav2.py \
+  --output /data/reports/map_x_run_y/nav2_metrics.csv
+```
+
+### 3. Cost Grid MSE Evaluation
+
+To evaluate the structural usability of a map without simulating the full Nav2 stack, you can compute the Mean Squared Error (MSE) of the optimal path costs (Cost Grid) between two 2D grids (e.g., Ground Truth vs SLAM Map).
+
+```bash
+./run-slam-evaluator.sh python3 metrics/cost_grid_mse.py \
+  /data/reports/map_x_run_y/gt_map_2d.yaml \
+  /data/reports/map_x_run_y/rtab/map_2d.yaml \
+  --goal_x 5.0 --goal_y 0.0
+```
 
 ## ROS networking notes
 

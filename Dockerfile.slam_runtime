@@ -19,6 +19,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-jazzy-sophus \
     ros-jazzy-cv-bridge \
     ros-jazzy-image-transport \
+    ros-jazzy-navigation2 \
+    ros-jazzy-nav2-bringup \
+    ros-jazzy-nav2-simple-commander \
+    ros-jazzy-depthimage-to-laserscan \
     libeigen3-dev \
     libopencv-dev \
     libopencv-calib3d-dev \
@@ -46,11 +50,11 @@ RUN pip3 install --break-system-packages rosbags
 RUN git clone --depth 1 https://github.com/stevenlovegrove/Pangolin.git /tmp/Pangolin && \
     cd /tmp/Pangolin && \
     cmake -B build -S . \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DBUILD_TESTS=OFF \
-      -DBUILD_EXAMPLES=OFF \
-      -DBUILD_PANGOLIN_PYTHON=OFF \
-      -DBUILD_PANGO_PYTHON=OFF && \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_TESTS=OFF \
+    -DBUILD_EXAMPLES=OFF \
+    -DBUILD_PANGOLIN_PYTHON=OFF \
+    -DBUILD_PANGO_PYTHON=OFF && \
     cmake --build build -j"$(nproc)" && \
     cmake --install build && \
     rm -rf /tmp/Pangolin
