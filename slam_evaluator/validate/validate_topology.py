@@ -174,7 +174,9 @@ def validate_topology(path: Path, args: argparse.Namespace) -> int:
             f"average degree {avg_degree:.3f} exceeds threshold {args.max_avg_degree:.3f}"
         )
     if args.max_max_degree is not None and max_degree > args.max_max_degree:
-        warnings.append(f"max degree {max_degree} exceeds threshold {args.max_max_degree}")
+        warnings.append(
+            f"max degree {max_degree} exceeds threshold {args.max_max_degree}"
+        )
 
     if edge_weights:
         sorted_weights = sorted(edge_weights)
@@ -202,7 +204,9 @@ def validate_topology(path: Path, args: argparse.Namespace) -> int:
         print(f"largest_component: {largest_component} ({largest_component_ratio:.3f})")
         print(f"isolated_nodes: {isolated_nodes}")
         print(f"degree_avg_max: {avg_degree:.3f}, {max_degree}")
-        print(f"weight_min_median_p95_max: {min_w:.4f}, {median_w:.4f}, {p95:.4f}, {max_w:.4f}")
+        print(
+            f"weight_min_median_p95_max: {min_w:.4f}, {median_w:.4f}, {p95:.4f}, {max_w:.4f}"
+        )
 
     if warnings:
         for item in warnings:
@@ -218,15 +222,19 @@ def validate_topology(path: Path, args: argparse.Namespace) -> int:
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Validate topology JSON output quality.")
-    parser.add_argument("topology_json_path", help="Path to topology.json")
-    parser.add_argument("--allow-self-loops", action="store_true")
-    parser.add_argument("--allow-noncontiguous-ids", action="store_true")
-    parser.add_argument("--max-isolated-nodes", type=int, default=0)
-    parser.add_argument("--min-largest-component-ratio", type=float, default=1.0)
-    parser.add_argument("--max-avg-degree", type=float, default=None)
-    parser.add_argument("--max-max-degree", type=int, default=None)
-    parser.add_argument("--max-p95-weight", type=float, default=None)
+    parser = argparse.ArgumentParser(
+        description="Validate topology JSON output quality."
+    )
+    parser.add_argument(
+        "--topology_json_path", required=True, help="Path to topology.json"
+    )
+    parser.add_argument("--allow_self_loops", action="store_true")
+    parser.add_argument("--allow_noncontiguous_ids", action="store_true")
+    parser.add_argument("--max_isolated_nodes", type=int, default=0)
+    parser.add_argument("--min_largest_component_ratio", type=float, default=1.0)
+    parser.add_argument("--max_avg_degree", type=float, default=None)
+    parser.add_argument("--max_max_degree", type=int, default=None)
+    parser.add_argument("--max_p95_weight", type=float, default=None)
     parser.add_argument("--quiet", action="store_true")
     return parser.parse_args()
 

@@ -81,8 +81,19 @@ def extract_reference_traj(input_file_name: str, output_file_name: str):
                         last_row_data = current_row_data
 
 
-if __name__ == "__main__":
-    input_file_name = sys.argv[1]
-    output_file_name = sys.argv[2]
+def parse_args():
+    import argparse
 
-    extract_reference_traj(input_file_name, output_file_name)
+    parser = argparse.ArgumentParser(
+        description="Extract reference trajectory from rosbag /tf topic."
+    )
+    parser.add_argument(
+        "--bag_path", required=True, help="Path to the rosbag directory"
+    )
+    parser.add_argument("--output_csv", required=True, help="Path to output CSV file")
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    extract_reference_traj(args.bag_path, args.output_csv)

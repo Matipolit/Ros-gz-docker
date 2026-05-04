@@ -67,7 +67,7 @@ RUN mkdir -p /opt/slam_ws/src
 RUN printf '%s\n' '#!/usr/bin/env bash' \
     'set -eo pipefail' \
     '' \
-    '# Adresy Twojego forka i oryginalnego silnika' \
+    '# orb-slam 3 wrapper, my fork adding export features' \
     'WRAPPER_REPO="https://github.com/Matipolit/ORB_SLAM3_ROS2.git"' \
     'WRAPPER_BRANCH="jazzy-noble"' \
     'CORE_REPO="https://github.com/UZ-SLAMLab/ORB_SLAM3.git"' \
@@ -75,37 +75,37 @@ RUN printf '%s\n' '#!/usr/bin/env bash' \
     'source /opt/ros/jazzy/setup.bash' \
     'mkdir -p /opt/slam_ws/src && cd /opt/slam_ws/src' \
     '' \
-    '# 1. Pobieranie Twojego wrappera' \
+    '# 1. Downloading the wrapper' \
     'if [ ! -d ORB_SLAM3_ROS2 ]; then' \
     '  git clone --branch "${WRAPPER_BRANCH}" --depth 1 "${WRAPPER_REPO}" ORB_SLAM3_ROS2' \
     'fi' \
     '' \
-    '# 2. Pobieranie silnika głównego' \
+    '# 2. Downloading the engine' \
     'if [ ! -d ORB_SLAM3 ]; then' \
     '  git clone "${CORE_REPO}" ORB_SLAM3' \
     'fi' \
     '' \
-    '# 3. Patchowanie silnika Twoim skryptem z forka' \
-    'echo "Aplikowanie łatek na silnik ORB_SLAM3..."' \
+    '# 3. Patching the engine' \
+    'echo "Patching the main ORB_SLAM3 engine for newer C++ builds..."' \
     'chmod +x /opt/slam_ws/src/ORB_SLAM3_ROS2/patch_engine.sh' \
     '/opt/slam_ws/src/ORB_SLAM3_ROS2/patch_engine.sh /opt/slam_ws/src/ORB_SLAM3' \
     '' \
-    '# 4. Budowanie silnika (to potrwa najdłużej)' \
-    'echo "Kompilacja silnika ORB_SLAM3..."' \
+    '# 4. Building the engine' \
+    'echo "Compiling ORB_SLAM3..."' \
     'cd /opt/slam_ws/src/ORB_SLAM3 && chmod +x build.sh && ./build.sh' \
     '' \
-    '# 5. Rozpakowanie słownika' \
+    '# 5. Unpack the vocabulary' \
     'VOC_GZ="/opt/slam_ws/src/ORB_SLAM3/Vocabulary/ORBvoc.txt.tar.gz"' \
     'VOC_TXT="/opt/slam_ws/src/ORB_SLAM3/Vocabulary/ORBvoc.txt"' \
     'if [ -f "${VOC_GZ}" ] && [ ! -f "${VOC_TXT}" ]; then' \
     '  cd /opt/slam_ws/src/ORB_SLAM3/Vocabulary && tar -xf ORBvoc.txt.tar.gz' \
     'fi' \
     '' \
-    '# 6. Instalacja zależności rosdep i budowanie wrappera' \
+    '# 6. Install rosdep dependencies and build the wrapper' \
     'cd /opt/slam_ws' \
     'rosdep update && rosdep install --from-paths src --ignore-src -y --rosdistro jazzy || true' \
     '' \
-    'echo "Budowanie wrappera ROS 2..."' \
+    'echo "Building ROS 2 wrapper for ORB-SLAM 3..."' \
     'colcon build --symlink-install --packages-select orbslam3' \
     > /usr/local/bin/bootstrap-orbslam3-wrapper && chmod +x /usr/local/bin/bootstrap-orbslam3-wrapper
 

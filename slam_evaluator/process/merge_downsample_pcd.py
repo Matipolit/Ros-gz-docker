@@ -36,87 +36,92 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Merge .pcd files from a folder into one downsampled point cloud."
     )
-    parser.add_argument("source_folder", help="Folder containing input .pcd files")
-    parser.add_argument("output_file", help="Output point cloud path")
     parser.add_argument(
-        "voxel_size", type=float, help="Voxel size for downsampling (> 0)"
+        "--source_folder", required=True, help="Folder containing input .pcd files"
+    )
+    parser.add_argument("--output_file", required=True, help="Output point cloud path")
+    parser.add_argument(
+        "--voxel_size",
+        required=True,
+        type=float,
+        help="Voxel size for downsampling (> 0)",
     )
 
     parser.add_argument(
-        "--output-format",
+        "--output_format",
         choices=["auto", "pcd", "ply"],
         default="auto",
         help="Force output format. 'auto' uses output file extension (default).",
     )
 
     parser.add_argument(
-        "--min-range",
+        "--min_range",
         type=float,
         default=None,
-        help="Keep points with distance >= min-range from origin (meters).",
+        help="Keep points with distance >= min_range from origin (meters).",
     )
     parser.add_argument(
-        "--max-range",
+        "--max_range",
         type=float,
         default=None,
-        help="Keep points with distance <= max-range from origin (meters).",
+        help="Keep points with distance <= max_range from origin (meters).",
     )
 
     parser.add_argument(
-        "--crop-x-min", type=float, default=None, help="ROI min X (meters)."
+        "--crop_x_min", type=float, default=None, help="ROI min X (meters)."
     )
     parser.add_argument(
-        "--crop-x-max", type=float, default=None, help="ROI max X (meters)."
+        "--crop_x_max", type=float, default=None, help="ROI max X (meters)."
     )
     parser.add_argument(
-        "--crop-y-min", type=float, default=None, help="ROI min Y (meters)."
+        "--crop_y_min", type=float, default=None, help="ROI min Y (meters)."
     )
     parser.add_argument(
-        "--crop-y-max", type=float, default=None, help="ROI max Y (meters)."
+        "--crop_y_max", type=float, default=None, help="ROI max Y (meters)."
     )
     parser.add_argument(
-        "--crop-z-min", type=float, default=None, help="ROI min Z (meters)."
+        "--crop_z_min", type=float, default=None, help="ROI min Z (meters)."
     )
     parser.add_argument(
-        "--crop-z-max", type=float, default=None, help="ROI max Z (meters)."
+        "--crop_z_max", type=float, default=None, help="ROI max Z (meters)."
     )
 
     parser.add_argument(
-        "--rotate-z-deg",
+        "--rotate_z_deg",
         type=float,
         default=0.0,
         help="Apply fixed rotation around Z axis (degrees) to each frame before merge.",
     )
 
     parser.add_argument(
-        "--range-mode",
+        "--range_mode",
         choices=["global_origin", "sensor_local"],
         default="global_origin",
         help="How to measure distance for min/max range filtering. 'sensor_local' reads PCD VIEWPOINT to filter relative to the camera.",
     )
 
     parser.add_argument(
-        "--keyframe-poses",
+        "--keyframe_poses",
         type=str,
         default=None,
         help="Path to poses.txt from SLAM. If provided, only .pcd files matching a keyframe timestamp will be processed.",
     )
     parser.add_argument(
-        "--keyframe-tolerance",
+        "--keyframe_tolerance",
         type=float,
         default=0.05,
         help="Max time difference (in seconds) to match a PCD to a keyframe (default: 0.05).",
     )
 
     parser.add_argument(
-        "--trajectory-csv",
+        "--trajectory_csv",
         type=str,
         default=None,
         help="Path to trajectory CSV (t,x,y,z...). Used in sensor_local mode to override zeroed PCD VIEWPOINTs.",
     )
 
     parser.add_argument(
-        "--disable-centroid-guard",
+        "--disable_centroid_guard",
         action="store_true",
         help="Disable heuristic that skips likely corrupted local-frame clouds near origin.",
     )
@@ -138,15 +143,15 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("voxel_size must be > 0")
 
     if args.min_range is not None and args.min_range < 0.0:
-        raise ValueError("--min-range must be >= 0")
+        raise ValueError("--min_range must be >= 0")
     if args.max_range is not None and args.max_range < 0.0:
-        raise ValueError("--max-range must be >= 0")
+        raise ValueError("--max_range must be >= 0")
     if (
         args.min_range is not None
         and args.max_range is not None
         and args.min_range > args.max_range
     ):
-        raise ValueError("--min-range cannot be greater than --max-range")
+        raise ValueError("--min_range cannot be greater than --max_range")
 
     for axis in ("x", "y", "z"):
         lo = getattr(args, f"crop_{axis}_min")

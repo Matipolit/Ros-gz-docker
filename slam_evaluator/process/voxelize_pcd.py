@@ -9,12 +9,19 @@ from pathlib import Path
 
 import open3d as o3d
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Voxel downsample a point cloud.")
-    parser.add_argument("input_file", help="Input point cloud path")
-    parser.add_argument("output_file", help="Output point cloud path")
-    parser.add_argument("voxel_size", type=float, help="Voxel size for downsampling (> 0)")
+    parser.add_argument("--input_file", required=True, help="Input point cloud path")
+    parser.add_argument("--output_file", required=True, help="Output point cloud path")
+    parser.add_argument(
+        "--voxel_size",
+        required=True,
+        type=float,
+        help="Voxel size for downsampling (> 0)",
+    )
     return parser.parse_args()
+
 
 def main() -> int:
     args = parse_args()
@@ -35,7 +42,7 @@ def main() -> int:
         return 1
 
     print(f"Loaded point cloud with {len(cloud.points)} points.")
-    
+
     downsampled = cloud.voxel_down_sample(voxel_size=args.voxel_size)
 
     if len(downsampled.points) == 0:
@@ -44,11 +51,16 @@ def main() -> int:
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
     if not o3d.io.write_point_cloud(str(output_file), downsampled):
-        print(f"Error: Failed to write output point cloud: {output_file}", file=sys.stderr)
+        print(
+            f"Error: Failed to write output point cloud: {output_file}", file=sys.stderr
+        )
         return 1
-        
-    print(f"Saved downsampled point cloud with {len(downsampled.points)} points to: {output_file}")
+
+    print(
+        f"Saved downsampled point cloud with {len(downsampled.points)} points to: {output_file}"
+    )
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

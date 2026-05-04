@@ -92,45 +92,45 @@ Use [run-slam-evaluator.sh](../run-slam-evaluator.sh). It mounts host `data/` as
 Basic example (output `.ply`):
 
 ```bash
-./run-slam-evaluator.sh merge_downsample_pcd.py \
-  /data/reports/working_pcd_files \
-  /data/reports/map_merged_downsampled.ply \
-  0.05
+./run-slam-evaluator.sh python3 process/merge_downsample_pcd.py \
+  --source_folder /data/reports/working_pcd_files \
+  --output_file /data/reports/map_merged_downsampled.ply \
+  --voxel_size 0.05
 ```
 
 ### 4.3 Recommended objective filtering options
 
 To improve fairness against RTAB-Map cloud, use:
 - same voxel resolution (`voxel_size`)
-- depth/range gating (`--min-range`, `--max-range`)
-- optional ROI cropping (`--crop-*`)
-- optional fixed Z rotation only for legacy datasets (`--rotate-z-deg`)
+- depth/range gating (`--min_range`, `--max_range`)
+- optional ROI cropping (`--crop_x_min`, `--crop_y_min`, etc.)
+- optional fixed Z rotation only for legacy datasets (`--rotate_z_deg`)
 
 Example:
 
 ```bash
-./run-slam-evaluator.sh python3 ground_truth/merge_downsample_pcd.py \
-  /data/reports/working_pcd_files \
-  /data/reports/map_merged_downsampled_filtered.ply \
-  0.05 \
-  --range-mode sensor_local \
-  --min-range 0.3 \
-  --max-range 8.0 \
-  --crop-z-min -1.0 \
-  --crop-z-max 2.5
+./run-slam-evaluator.sh python3 process/merge_downsample_pcd.py \
+  --source_folder /data/reports/working_pcd_files \
+  --output_file /data/reports/map_merged_downsampled_filtered.ply \
+  --voxel_size 0.05 \
+  --range_mode sensor_local \
+  --min_range 0.3 \
+  --max_range 8.0 \
+  --crop_z_min -1.0 \
+  --crop_z_max 2.5
 ```
 
-**Note on `--range-mode sensor_local`:**
-When exporting with `fixed_frame:=root`, the points in `.pcd` are saved in global coordinates. However, `pcl_ros` saves the original sensor origin into the PCD `VIEWPOINT` header. The `--range-mode sensor_local` argument reads this viewpoint to correctly filter depth range relative to the moving camera, just like RTAB-Map does, rather than filtering distance from the static global origin `(0,0,0)`.
+**Note on `--range_mode sensor_local`:**
+When exporting with `fixed_frame:=root`, the points in `.pcd` are saved in global coordinates. However, `pcl_ros` saves the original sensor origin into the PCD `VIEWPOINT` header. The `--range_mode sensor_local` argument reads this viewpoint to correctly filter depth range relative to the moving camera, just like RTAB-Map does, rather than filtering distance from the static global origin `(0,0,0)`.
 
 Optional format override:
 
 ```bash
-./run-slam-evaluator.sh merge_downsample_pcd.py \
-  /data/reports/working_pcd_files \
-  /data/reports/map_merged_anyname \
-  0.05 \
-  --output-format ply
+./run-slam-evaluator.sh python3 process/merge_downsample_pcd.py \
+  --source_folder /data/reports/working_pcd_files \
+  --output_file /data/reports/map_merged_anyname \
+  --voxel_size 0.05 \
+  --output_format ply
 ```
 
 Script used: [merge_downsample_pcd.py](merge_downsample_pcd.py)
@@ -143,9 +143,9 @@ For each input `.pcd` file:
 1. Reads cloud from disk.
 2. Skips empty clouds.
 3. Optionally applies centroid-based guard for likely bad local-frame artifacts.
-4. Optionally rotates cloud around Z (`--rotate-z-deg`).
-5. Optionally filters by radial distance (`--min-range`, `--max-range`). If `--range-mode sensor_local` is used, distance is calculated from the PCD `VIEWPOINT` (sensor origin), otherwise from the global origin `(0,0,0)`.
-6. Optionally crops with axis-aligned ROI (`--crop-x/y/z-min/max`).
+4. Optionally rotates cloud around Z (`--rotate_z_deg`).
+5. Optionally filters by radial distance (`--min_range`, `--max_range`). If `--range_mode sensor_local` is used, distance is calculated from the PCD `VIEWPOINT` (sensor origin), otherwise from the global origin `(0,0,0)`.
+6. Optionally crops with axis-aligned ROI (`--crop_x_min`, `--crop_x_max`, `--crop_y_min`, `--crop_y_max`, `--crop_z_min`, `--crop_z_max`).
 7. Downsamples each valid frame with selected voxel size.
 8. Adds to merged cloud.
 9. Periodically re-downsamples merged cloud (every 20 valid files).
@@ -164,7 +164,7 @@ After all files:
 2. Use comparable effective range limits in GT and RTAB-Map.
 3. Use the same final voxel size for both exported maps.
 4. Compare over common observed region (avoid evaluating huge GT-only regions).
-5. Treat `--rotate-z-deg` as a migration workaround, not the default method.
+5. Treat `--rotate_z_deg` as a migration workaround, not the default method.
 
 ---
 
@@ -193,7 +193,7 @@ The TF frame name is wrong/unavailable for the played bag.
 
 ### 7.6 All points disappear after filtering
 Your filtering may be too aggressive.
-- Relax `--min-range` / increase `--max-range`.
+- Relax `--min_range` / increase `--max_range`.
 - Widen ROI bounds.
 - Test first without crop arguments, then tighten progressively.
 
@@ -231,11 +231,11 @@ Play rosbag in another shell (with `--delay 3`), wait for completion, then merge
 
 ```bash
 ./build-slam-evaluator.sh
-./run-slam-evaluator.sh python3 ground_truth/merge_downsample_pcd.py \
-  /data/reports/working_pcd_files \
-  /data/reports/map_merged_downsampled.ply \
-  0.05 \
-  --range-mode sensor_local \
-  --min-range 0.3 \
-  --max-range 8.0
+./run-slam-evaluator.sh python3 process/merge_downsample_pcd.py \
+  --source_folder /data/reports/working_pcd_files \
+  --output_file /data/reports/map_merged_downsampled.ply \
+  --voxel_size 0.05 \
+  --range_mode sensor_local \
+  --min_range 0.3 \
+  --max_range 8.0
 ```

@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 import time
@@ -29,25 +30,36 @@ def generate_reference_cloud_trimesh(
     print(f"Starting surface sampling ({target_points} points)...")
     start_time = time.time()
 
-    # Równomierne próbkowanie powierzchni (odpowiednik Uniform/Poisson Sampling)
-    points, faces = trimesh.sample.sample_surface_even(mesh, target_points)
+    # Uniform surface sampling (equivalent to Uniform/Poisson Sampling)
+    points, _ = trimesh.sample.sample_surface_even(mesh, target_points)
 
     end_time = time.time()
     print(f"Sampling finished in {end_time - start_time:.2f} seconds.")
 
     print(f"Saving reference point cloud to: {output_ply_path}")
 
-    # Tworzenie obiektu chmury punktów i zapis do .ply
+    # Creating a point cloud object and saving to .ply
     point_cloud = trimesh.points.PointCloud(points)
     point_cloud.export(output_ply_path)
 
     print("Ground truth point cloud generated.")
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Convert mesh to point cloud using trimesh."
+    )
+    parser.add_argument("--input_mesh_path", required=True, help="Input mesh file path")
+    parser.add_argument("--output_ply_path", required=True, help="Output PLY file path")
+    parser.add_argument(
+        "--target_points", type=int, default=2000000, help="Target number of points"
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    input_file_name = sys.argv[1]
-    output_file_name = sys.argv[2]
+    args = parse_args()
 
     generate_reference_cloud_trimesh(
-        input_file_name, output_file_name, target_points=2000000
+        args.input_mesh_path, args.output_ply_path, target_points=args.target_points
     )

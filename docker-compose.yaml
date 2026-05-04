@@ -1,0 +1,96 @@
+services:
+  isaac-sim:
+    image: isaac-sim-runner:jazzy
+    container_name: ros-jazzy-container
+    network_mode: host
+    ipc: host
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    working_dir: /home/ubuntu/shared
+    stdin_open: true
+    tty: true
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_QPA_PLATFORM=xcb
+      - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/tmp}
+      - ROS_DISTRO=jazzy
+      - ROS_DOMAIN_ID=0
+      - ROS_LOCALHOST_ONLY=1
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - LD_LIBRARY_PATH=/opt/isaacsim/_build/linux-x86_64/release/exts/isaacsim.ros2.bridge/jazzy/lib
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${XDG_RUNTIME_DIR:-/tmp}:${XDG_RUNTIME_DIR:-/tmp}:rw
+      - ${HOST_DATA_DIR:-./data}:/home/ubuntu/shared:rw
+      - ${HOST_SCRIPTS_DIR:-./slam_evaluator}:/workspace/slam_evaluator:rw
+      - ${HOST_DATA_DIR:-./data}/isaac-sim-cache/ov-data:/home/ubuntu/.local/share/ov:rw
+      - ${HOST_DATA_DIR:-./data}/isaac-sim-cache/ov-cache:/home/ubuntu/.cache/ov:rw
+      - ${HOST_DATA_DIR:-./data}/isaac-sim-cache/warp:/home/ubuntu/.cache/warp:rw
+      - ${HOST_DATA_DIR:-./data}/isaac-sim-cache/nvidia-omniverse:/home/ubuntu/.nvidia-omniverse:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  slam-runtime:
+    image: slam-runtime:jazzy
+    container_name: slam-runtime-container
+    network_mode: host
+    ipc: host
+    privileged: true
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: bash
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_QPA_PLATFORM=xcb
+      - XDG_RUNTIME_DIR=/tmp
+      - QT_X11_NO_MITSHM=1
+      - MESA_NO_MITSHM=1
+      - LIBGL_MIT_SHM=0
+      - ROS_DOMAIN_ID=0
+      - ROS_LOCALHOST_ONLY=1
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - LD_LIBRARY_PATH=/opt/slam_ws/src/ORB_SLAM3/lib
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${HOST_DATA_DIR:-./data}:/data:rw
+      - ${HOST_DATA_DIR:-./data}:/workspace/data:rw
+      - ${HOST_DATA_DIR:-./data}/rtabmap:/root/.ros:rw
+      - ${HOST_DATA_DIR:-./data}/slam_ws:/opt/slam_ws:rw
+      - ${HOST_SCRIPTS_DIR:-./slam_evaluator}:/workspace/slam_evaluator:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  slam-evaluator:
+    image: slam-evaluator:py312
+    container_name: slam-evaluator-container
+    working_dir: /workspace/slam_evaluator
+    stdin_open: true
+    tty: true
+    command: bash
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      - ${HOST_DATA_DIR:-./data}:/data:rw
+      - ${HOST_SCRIPTS_DIR:-./slam_evaluator}:/workspace/slam_evaluator:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

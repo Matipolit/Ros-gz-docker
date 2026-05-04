@@ -79,9 +79,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="List all topics in a rosbag/mcap and print one example message per topic."
     )
-    parser.add_argument("input_bag_file", help="Path to rosbag/mcap file")
     parser.add_argument(
-        "--max-example-chars",
+        "--input_bag_file", required=True, help="Path to rosbag/mcap file"
+    )
+    parser.add_argument(
+        "--max_example_chars",
         type=int,
         default=500,
         help="Maximum number of characters to print for each example message",
@@ -89,7 +91,7 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
 
     if args.max_example_chars <= 0:
-        raise ValueError("--max-example-chars must be > 0")
+        raise ValueError("--max_example_chars must be > 0")
 
     return args
 

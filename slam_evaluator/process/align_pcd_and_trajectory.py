@@ -105,7 +105,7 @@ def load_slam_poses(path: Path) -> list[tuple[float, int, np.ndarray]]:
             line = line.strip()
             if not line or line.startswith("#") or line.startswith("t"):
                 continue
-            parts = line.split(',') if ',' in line else line.split()
+            parts = line.split(",") if "," in line else line.split()
             if len(parts) < 8:
                 continue
             try:
@@ -158,14 +158,23 @@ def interpolate_gt_pose(t: float, gt: list[tuple[float, np.ndarray]]) -> np.ndar
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--gt-trajectory", required=True, type=Path)
-    ap.add_argument("--slam-poses", required=True, type=Path)
-    ap.add_argument("--slam-cloud", required=False, type=Path)
-    ap.add_argument("--out-poses", required=True, type=Path)
-    ap.add_argument("--out-cloud", required=False, type=Path)
-    ap.add_argument("--align-icp", action="store_true", help="Refine alignment using ICP")
-    ap.add_argument("--gt-cloud", required=False, type=Path, help="Ground Truth parameter for ICP")
-    ap.add_argument("--icp-threshold", type=float, default=0.2, help="Distance threshold for ICP refinement")
+    ap.add_argument("--gt_trajectory", required=True, type=Path)
+    ap.add_argument("--slam_poses", required=True, type=Path)
+    ap.add_argument("--slam_cloud", required=False, type=Path)
+    ap.add_argument("--out_poses", required=True, type=Path)
+    ap.add_argument("--out_cloud", required=False, type=Path)
+    ap.add_argument(
+        "--align_icp", action="store_true", help="Refine alignment using ICP"
+    )
+    ap.add_argument(
+        "--gt_cloud", required=False, type=Path, help="Ground Truth parameter for ICP"
+    )
+    ap.add_argument(
+        "--icp_threshold",
+        type=float,
+        default=0.2,
+        help="Distance threshold for ICP refinement",
+    )
     args = ap.parse_args()
 
     gt = load_gt_csv(args.gt_trajectory)
@@ -184,28 +193,35 @@ def main() -> int:
     cloud = None
     if args.align_icp:
         if not args.gt_cloud or not args.slam_cloud:
-            raise RuntimeError("--gt-cloud and --slam-cloud are required for ICP alignment.")
-            
+            raise RuntimeError(
+                "--gt_cloud and --slam_cloud are required for ICP alignment."
+            )
+
         print("Loading clouds for ICP refinement...")
         cloud = o3d.io.read_point_cloud(str(args.slam_cloud))
         gt_cloud = o3d.io.read_point_cloud(str(args.gt_cloud))
-        
+
         if len(cloud.points) == 0 or len(gt_cloud.points) == 0:
             raise RuntimeError("One of the clouds is empty. Cannot perform ICP.")
-            
+
         print(f"Applying initial trajectory alignment to SLAM cloud before ICP...")
         cloud.transform(T_align)
-        
+
         print(f"Running ICP (threshold={args.icp_threshold})...")
         icp_result = o3d.pipelines.registration.registration_icp(
-            cloud, gt_cloud, args.icp_threshold, np.eye(4),
-            o3d.pipelines.registration.TransformationEstimationPointToPoint()
+            cloud,
+            gt_cloud,
+            args.icp_threshold,
+            np.eye(4),
+            o3d.pipelines.registration.TransformationEstimationPointToPoint(),
         )
-        
+
         T_icp = icp_result.transformation
-        print(f"ICP fitness: {icp_result.fitness:.6f}, inlier_rmse: {icp_result.inlier_rmse:.6f}")
+        print(
+            f"ICP fitness: {icp_result.fitness:.6f}, inlier_rmse: {icp_result.inlier_rmse:.6f}"
+        )
         print(f"ICP refinement translation: {T_icp[:3, 3]}")
-        
+
         cloud.transform(T_icp)
         T_align = T_icp @ T_align
 
@@ -235,7 +251,7 @@ def main() -> int:
         print(f"Wrote aligned cloud: {args.out_cloud}  ({len(cloud.points)} pts)")
     elif args.slam_cloud or args.out_cloud:
         print(
-            "Warning: Both --slam-cloud and --out-cloud must be provided to transform the point cloud."
+            "Warning: Both --slam_cloud and --out_cloud must be provided to transform the point cloud."
         )
 
     return 0

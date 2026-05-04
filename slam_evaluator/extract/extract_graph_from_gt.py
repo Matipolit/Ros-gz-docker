@@ -59,14 +59,27 @@ def extract_topology(
     max_edge_distance: float | None = None,
     collision_check_step: float = 0.2,
     obstacle_margin: float = 0.0,
+    min_node_distance: float = 0.0,
 ) -> None:
     traj_df = pd.read_csv(trajectory_csv_path)
     poses = _validate_trajectory(traj_df)
 
+    if min_node_distance > 0:
+        sampled_poses = [poses[0]]
+        for i in range(1, len(poses)):
+            if np.linalg.norm(poses[i] - sampled_poses[-1]) >= min_node_distance:
+                sampled_poses.append(poses[i])
+        poses = np.array(sampled_poses)
+        print(
+            f"Downsampled trajectory from {len(traj_df)} to {len(poses)} nodes (min_node_distance={min_node_distance}m)."
+        )
+
     pcd = o3d.io.read_point_cloud(point_cloud_path)
     obstacles = np.asarray(pcd.points, dtype=np.float64)
     if obstacles.size == 0:
-        raise ValueError("Point cloud has no points; cannot compute topology clearance.")
+        raise ValueError(
+            "Point cloud has no points; cannot compute topology clearance."
+        )
     if obstacles.ndim != 2 or obstacles.shape[1] != 3:
         raise ValueError("Point cloud must be a Nx3 set of points.")
     obstacles, dropped_points = _sanitize_point_cloud_points(obstacles)
@@ -81,7 +94,9 @@ def extract_topology(
 
     distances, _ = obstacle_tree.query(poses, k=1)
     if not np.isfinite(distances).all():
-        raise ValueError("Found non-finite clearance distances. Check point cloud quality.")
+        raise ValueError(
+            "Found non-finite clearance distances. Check point cloud quality."
+        )
 
     pose_tree = cKDTree(poses)
     if max_edge_distance is None:
@@ -133,32 +148,40 @@ def extract_topology(
 
     print(
         f"Generated graph: {len(poses)} nodes, {len(edges)} edges "
-        f"(max_edge_distance={max_edge_distance:.3f}, step={collision_check_step:.3f}, margin={obstacle_margin:.3f})"
+        f"(max_edge_distance={max_edge_distance:.3f}, collision_check_step={collision_check_step:.3f}, obstacle_margin={obstacle_margin:.3f})"
     )
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Extract topology graph from trajectory and map point cloud.")
+    parser = argparse.ArgumentParser(
+        description="Extract topology graph from trajectory and map point cloud."
+    )
     parser.add_argument("trajectory_csv_path", nargs="?", default="traj_gt.csv")
     parser.add_argument("point_cloud_path", nargs="?", default="map_gt.ply")
     parser.add_argument("output_json_path", nargs="?", default="topo_gt.json")
     parser.add_argument(
-        "--max-edge-distance",
+        "--max_edge_distance",
         type=float,
         default=None,
         help="Maximum candidate edge length in meters. If omitted, uses an adaptive value from clearances.",
     )
     parser.add_argument(
-        "--collision-check-step",
+        "--collision_check_step",
         type=float,
         default=0.2,
         help="Sampling step in meters when checking segment collision against obstacles.",
     )
     parser.add_argument(
-        "--obstacle-margin",
+        "--obstacle_margin",
         type=float,
         default=0.0,
         help="Minimum allowed distance to obstacles in meters for collision checks.",
+    )
+    parser.add_argument(
+        "--min_node_distance",
+        type=float,
+        default=0.0,
+        help="Minimum distance between nodes in meters (downsampling).",
     )
     return parser.parse_args(argv)
 
@@ -172,4 +195,5 @@ if __name__ == "__main__":
         max_edge_distance=args.max_edge_distance,
         collision_check_step=args.collision_check_step,
         obstacle_margin=args.obstacle_margin,
+        min_node_distance=args.min_node_distance,
     )

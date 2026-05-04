@@ -190,13 +190,15 @@ The `clip_pcd.py` script allows clipping by an Axis-Aligned Bounding Box (AABB),
   /data/reports/map_x_run_y/rtab/rtabmap_cloud_aligned.ply \
   /data/reports/map_x_run_y/rtab/rtabmap_cloud_clipped.ply \
   --trajectory /data/reports/map_x_run_y/ground_truth/traj.csv \
-  --tube-radius 5.0
+  --tube_radius 5.0
 ```
 
 Other available arguments include:
-- `--trajectory-bbox-margin`: define an automatic ROI bounding box around the trajectory with the given margin.
-- `--min-range` / `--max-range`: keep points within a distance from the origin.
-- `--crop-[x/y/z]-min` / `--crop-[x/y/z]-max`: define an ROI bounding box.
+- `--trajectory_bbox_margin`: define an automatic ROI bounding box around the trajectory with the given margin.
+- `--min_range` / `--max_range`: keep points within a distance from the origin.
+- `--crop_x_min` / `--crop_x_max`: define an ROI bounding box.
+- `--crop_y_min` / `--crop_y_max`: define an ROI bounding box.
+- `--crop_z_min` / `--crop_z_max`: define an ROI bounding box.
 
 ### Voxelizing point clouds
 
@@ -204,9 +206,9 @@ The `voxelize_pcd.py` script downsamples a point cloud to a uniform voxel grid.
 
 ```bash
 ./run-slam-evaluator.sh python3 process/voxelize_pcd.py \
-  /data/reports/map_x_run_y/rtab/rtabmap_cloud_clipped.ply \
-  /data/reports/map_x_run_y/rtab/rtabmap_cloud_voxelized.ply \
-  0.05
+  --input_file /data/reports/map_x_run_y/rtab/rtabmap_cloud_clipped.ply \
+  --output_file /data/reports/map_x_run_y/rtab/rtabmap_cloud_voxelized.ply \
+  --voxel_size 0.05
 ```
 
 ## Running SLAM algorithms
@@ -260,8 +262,9 @@ ros2 run orbslam3 rgbd /opt/slam_ws/src/ORB_SLAM3/Vocabulary/ORBvoc.txt /opt/sla
 
 And play a rosbag in another terminal.
 
-The trajectory will be output to FrameTrajectoryTUM.txt
-The sparse point cloud will be output as well.
+The trajectory will be saved as `FrameTrajectoryTUM.txt`
+The sparse point cloud will be saved as `orbslam3_final_map.pcd`, but the path can be configured by the ROS 2 parameter `final_map_pcd_path`.
+The graph will be saved as `covisibility_graph.txt`
 
 ### RTAB-Map
 
@@ -319,12 +322,12 @@ To align the RTAB-Map point cloud to Ground Truth, use the script:
 
 
 ```bash
-./run-slam-evaluator.sh python3 evaluate/align_opus.py \
-  --gt-trajectory /data/reports/map_x_run_y/ground_truth/traj.csv \
-  --rtab-poses    /data/reports/map_x_run_y/rtab/rtabmap_poses.txt \
-  --rtab-cloud    /data/reports/map_x_run_y/rtab/rtabmap_cloud.ply \
-  --out-poses     /data/reports/map_x_run_y/rtab/rtabmap_poses_aligned.txt \
-  --out-cloud     /data/reports/map_x_run_y/rtab/rtabmap_cloud_aligned.ply
+./run-slam-evaluator.sh python3 process/align_pcd_and_trajectory.py \
+  --gt_trajectory /data/reports/map_x_run_y/ground_truth/traj.csv \
+  --slam_poses    /data/reports/map_x_run_y/rtab/rtabmap_poses.txt \
+  --slam_cloud    /data/reports/map_x_run_y/rtab/rtabmap_cloud.ply \
+  --out_poses     /data/reports/map_x_run_y/rtab/rtabmap_poses_aligned.txt \
+  --out_cloud     /data/reports/map_x_run_y/rtab/rtabmap_cloud_aligned.ply
 ```
 
 ### SplaTAM
@@ -343,17 +346,17 @@ python3 splatam/run_rosbag_splatam.py \
   --delete \
   --profile balanced \
   --output_dir /data/reports/map_x_run_y/splatam \
-  /data/rosbags/map_x_run_y
+  --bag_path /data/rosbags/map_x_run_y
 ```
 
 After SplaTAM finishes mapping, extract the calculated trajectory into a CSV format compatible with other SLAM algorithms, by running:
 
 ```bash
-python3 splatam/export_splatam_traj.py \
-  /data/rosbags/map_x_run_y \
-  /data/reports/map_x_run_y/splatam/SplaTAM_Rosbag/params.npz \
-  /data/reports/map_x_run_y/splatam/SplaTAM_Rosbag/splatam_traj.csv \
-  3
+python3 splatam/export_traj_from_splatam.py \
+  --bag_path /data/rosbags/map_x_run_y \
+  --npz_path /data/reports/map_x_run_y/splatam/SplaTAM_Rosbag/params.npz \
+  --output_csv /data/reports/map_x_run_y/splatam/SplaTAM_Rosbag/splatam_traj.csv \
+  --stride 3
 ```
 *(Note: The last argument `3` is the frame extraction stride, which matches the `balanced` profile defaults).*
 
@@ -386,8 +389,8 @@ First, convert a generated map (e.g., from RTAB-Map or Ground Truth) into a stan
 
 ```bash
 ./run-slam-evaluator.sh python3 process/pcd_to_grid.py \
-  /data/reports/map_x_run_y/rtab/rtabmap_cloud.ply \
-  /data/reports/map_x_run_y/rtab/map_2d
+  --input /data/reports/map_x_run_y/rtab/rtabmap_cloud.ply \
+  --output_prefix /data/reports/map_x_run_y/rtab/map_2d
 ```
 
 This will output `map_2d.pgm` and `map_2d.yaml`.
@@ -408,7 +411,7 @@ In another terminal, run the evaluation script:
 ```bash
 # Inside the slam_runtime container
 python3 /workspace/slam_evaluator/metrics/evaluate_nav2.py \
-  --output /data/reports/map_x_run_y/nav2_metrics.csv
+  --output_csv /data/reports/map_x_run_y/nav2_metrics.csv
 ```
 
 ### 3. Cost Grid MSE Evaluation
@@ -417,8 +420,8 @@ To evaluate the structural usability of a map without simulating the full Nav2 s
 
 ```bash
 ./run-slam-evaluator.sh python3 metrics/cost_grid_mse.py \
-  /data/reports/map_x_run_y/gt_map_2d.yaml \
-  /data/reports/map_x_run_y/rtab/map_2d.yaml \
+  --map1_yaml /data/reports/map_x_run_y/gt_map_2d.yaml \
+  --map2_yaml /data/reports/map_x_run_y/rtab/map_2d.yaml \
   --goal_x 5.0 --goal_y 0.0
 ```
 

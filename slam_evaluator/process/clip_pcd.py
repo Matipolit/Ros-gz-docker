@@ -12,25 +12,49 @@ from typing import Optional
 import numpy as np
 import open3d as o3d
 
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Clip a .pcd file to a set size, range, or trajectory tube/bbox.")
+    parser = argparse.ArgumentParser(
+        description="Clip a .pcd file to a set size, range, or trajectory tube/bbox."
+    )
     parser.add_argument("input_file", help="Input point cloud path")
     parser.add_argument("output_file", help="Output point cloud path")
 
-    parser.add_argument("--min-range", type=float, help="Keep points with distance >= min-range from origin (meters).")
-    parser.add_argument("--max-range", type=float, help="Keep points with distance <= max-range from origin (meters).")
-    parser.add_argument("--crop-x-min", type=float, help="ROI min X (meters).")
-    parser.add_argument("--crop-x-max", type=float, help="ROI max X (meters).")
-    parser.add_argument("--crop-y-min", type=float, help="ROI min Y (meters).")
-    parser.add_argument("--crop-y-max", type=float, help="ROI max Y (meters).")
-    parser.add_argument("--crop-z-min", type=float, help="ROI min Z (meters).")
-    parser.add_argument("--crop-z-max", type=float, help="ROI max Z (meters).")
-    
-    parser.add_argument("--trajectory", type=Path, help="Path to GT trajectory CSV file for tube/bbox clipping.")
-    parser.add_argument("--tube-radius", type=float, help="Radius (meters) around the trajectory to keep points.")
-    parser.add_argument("--trajectory-bbox-margin", type=float, help="Margin (meters) to add to the trajectory bounding box.")
+    parser.add_argument(
+        "--min_range",
+        type=float,
+        help="Keep points with distance >= min_range from origin (meters).",
+    )
+    parser.add_argument(
+        "--max_range",
+        type=float,
+        help="Keep points with distance <= max_range from origin (meters).",
+    )
+    parser.add_argument("--crop_x_min", type=float, help="ROI min X (meters).")
+    parser.add_argument("--crop_x_max", type=float, help="ROI max X (meters).")
+    parser.add_argument("--crop_y_min", type=float, help="ROI min Y (meters).")
+    parser.add_argument("--crop_y_max", type=float, help="ROI max Y (meters).")
+    parser.add_argument("--crop_z_min", type=float, help="ROI min Z (meters).")
+    parser.add_argument("--crop_z_max", type=float, help="ROI max Z (meters).")
+
+    parser.add_argument(
+        "--trajectory",
+        type=Path,
+        help="Path to GT trajectory CSV file for tube/bbox clipping.",
+    )
+    parser.add_argument(
+        "--tube_radius",
+        type=float,
+        help="Radius (meters) around the trajectory to keep points.",
+    )
+    parser.add_argument(
+        "--trajectory_bbox_margin",
+        type=float,
+        help="Margin (meters) to add to the trajectory bounding box.",
+    )
 
     return parser.parse_args()
+
 
 def filter_by_range(
     cloud: o3d.geometry.PointCloud,
@@ -55,6 +79,7 @@ def filter_by_range(
         return o3d.geometry.PointCloud()
     return cloud.select_by_index(idx)
 
+
 def filter_by_roi(
     args: argparse.Namespace, cloud: o3d.geometry.PointCloud
 ) -> o3d.geometry.PointCloud:
@@ -74,15 +99,16 @@ def filter_by_roi(
     )
     return cloud.crop(aabb)
 
+
 def filter_by_trajectory(
     cloud: o3d.geometry.PointCloud,
     trajectory_path: Optional[Path],
     tube_radius: Optional[float],
-    bbox_margin: Optional[float]
+    bbox_margin: Optional[float],
 ) -> o3d.geometry.PointCloud:
     if not trajectory_path or (tube_radius is None and bbox_margin is None):
         return cloud
-        
+
     if len(cloud.points) == 0:
         return cloud
 
@@ -90,7 +116,7 @@ def filter_by_trajectory(
     try:
         with open(trajectory_path, "r") as f:
             reader = csv.reader(f)
-            next(reader, None) # skip header
+            next(reader, None)  # skip header
             for r in reader:
                 if len(r) < 8:
                     continue
@@ -109,7 +135,9 @@ def filter_by_trajectory(
         return cloud
 
     if bbox_margin is not None:
-        print(f"Filtering cloud to trajectory bounding box with {bbox_margin}m margin...")
+        print(
+            f"Filtering cloud to trajectory bounding box with {bbox_margin}m margin..."
+        )
         points_arr = np.array(traj_points)
         min_bound = points_arr.min(axis=0) - bbox_margin
         max_bound = points_arr.max(axis=0) + bbox_margin
@@ -117,23 +145,26 @@ def filter_by_trajectory(
         cloud = cloud.crop(aabb)
 
     if tube_radius is not None:
-        print(f"Filtering cloud to {tube_radius}m tube around {len(traj_points)} trajectory points...")
+        print(
+            f"Filtering cloud to {tube_radius}m tube around {len(traj_points)} trajectory points..."
+        )
         if len(cloud.points) == 0:
             return cloud
-            
+
         kdtree = o3d.geometry.KDTreeFlann(cloud)
         idx_to_keep = set()
         for pt in traj_points:
             k, idx, _ = kdtree.search_radius_vector_3d(pt, tube_radius)
             if k > 0:
                 idx_to_keep.update(idx)
-                
+
         if not idx_to_keep:
             return o3d.geometry.PointCloud()
-            
+
         cloud = cloud.select_by_index(list(idx_to_keep))
-        
+
     return cloud
+
 
 def main() -> int:
     args = parse_args()
@@ -143,9 +174,16 @@ def main() -> int:
     if not input_file.is_file():
         print(f"Error: Input file does not exist: {input_file}", file=sys.stderr)
         return 1
-        
-    if args.trajectory and args.tube_radius is None and args.trajectory_bbox_margin is None:
-        print("Error: --tube-radius or --trajectory-bbox-margin must be provided if --trajectory is used.", file=sys.stderr)
+
+    if (
+        args.trajectory
+        and args.tube_radius is None
+        and args.trajectory_bbox_margin is None
+    ):
+        print(
+            "Error: --tube_radius or --trajectory_bbox_margin must be provided if --trajectory is used.",
+            file=sys.stderr,
+        )
         return 1
 
     cloud = o3d.io.read_point_cloud(str(input_file))
@@ -157,7 +195,9 @@ def main() -> int:
 
     cloud = filter_by_range(cloud, args.min_range, args.max_range)
     cloud = filter_by_roi(args, cloud)
-    cloud = filter_by_trajectory(cloud, args.trajectory, args.tube_radius, args.trajectory_bbox_margin)
+    cloud = filter_by_trajectory(
+        cloud, args.trajectory, args.tube_radius, args.trajectory_bbox_margin
+    )
 
     if len(cloud.points) == 0:
         print("Error: Point cloud is empty after clipping.", file=sys.stderr)
@@ -165,11 +205,16 @@ def main() -> int:
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
     if not o3d.io.write_point_cloud(str(output_file), cloud):
-        print(f"Error: Failed to write output point cloud: {output_file}", file=sys.stderr)
+        print(
+            f"Error: Failed to write output point cloud: {output_file}", file=sys.stderr
+        )
         return 1
-        
-    print(f"Saved clipped point cloud with {len(cloud.points)} points to: {output_file}")
+
+    print(
+        f"Saved clipped point cloud with {len(cloud.points)} points to: {output_file}"
+    )
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

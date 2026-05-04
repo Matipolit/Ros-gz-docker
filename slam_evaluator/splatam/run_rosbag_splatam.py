@@ -1,13 +1,12 @@
 import argparse
 import os
-import subprocess
 import shutil
+import subprocess
 
 import numpy as np
 from PIL import Image
 from rosbags.rosbag2 import Reader
 from rosbags.typesys import Stores, get_typestore
-
 
 SPLATAM_PROFILES = {
     "fast": {
@@ -312,7 +311,9 @@ def main():
     parser = argparse.ArgumentParser(
         description="Extract Rosbag for SplaTAM and run it."
     )
-    parser.add_argument("bag", help="Path to the rosbag directory")
+    parser.add_argument(
+        "--bag_path", required=True, help="Path to the rosbag directory"
+    )
     parser.add_argument(
         "--color_topic", default="/camera/color/image_raw", help="Color image topic"
     )
@@ -420,7 +421,7 @@ def main():
         if slam_params[key] <= 0:
             parser.error(f"{key} must be > 0, got {slam_params[key]}.")
 
-    bag_name = os.path.basename(os.path.normpath(args.bag))
+    bag_name = os.path.basename(os.path.normpath(args.bag_path))
     dataset_dir = os.path.join(args.output_dir, bag_name)
     output_run_dir = os.path.join(
         os.path.dirname(dataset_dir),
@@ -434,9 +435,9 @@ def main():
                 print(f"Deleting previous output: {path}")
                 shutil.rmtree(path)
 
-    print(f"Extracting rosbag {args.bag} to {dataset_dir} ...")
+    print(f"Extracting rosbag {args.bag_path} to {dataset_dir} ...")
     num_frames = create_splatam_dataset(
-        args.bag, dataset_dir, args.color_topic, args.depth_topic
+        args.bag_path, dataset_dir, args.color_topic, args.depth_topic
     )
 
     if num_frames == 0:
@@ -538,7 +539,9 @@ EOF
         print(f"Executing export: {export_cmd}")
         export_result = subprocess.run(export_cmd, shell=True)
         if export_result.returncode != 0:
-            print(f"Error: export_ply failed with exit code {export_result.returncode}.")
+            print(
+                f"Error: export_ply failed with exit code {export_result.returncode}."
+            )
             return
 
         print(

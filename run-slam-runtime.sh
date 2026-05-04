@@ -28,30 +28,38 @@ if [ "$#" -eq 0 ]; then
     set -- bash
 fi
 
-docker run -it --rm \
-    --name "${CONTAINER_NAME}" \
-    --network host \
-    --privileged \
-    --ipc host \
-    --runtime=nvidia \
-    --gpus all \
-    --env "NVIDIA_VISIBLE_DEVICES=all" \
-    --env "NVIDIA_DRIVER_CAPABILITIES=all" \
-    --env "ROS_DOMAIN_ID=${ROS_DOMAIN_ID}" \
-    --env "ROS_LOCALHOST_ONLY=${ROS_LOCALHOST_ONLY}" \
-    --env "RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION}" \
-    --env "DISPLAY=${DISPLAY:-}" \
-    --env "QT_QPA_PLATFORM=xcb" \
-    --env "XDG_RUNTIME_DIR=/tmp" \
-    --env "QT_X11_NO_MITSHM=1" \
-    --env "MESA_NO_MITSHM=1" \
-    --env "LIBGL_MIT_SHM=0" \
-    --env "LD_LIBRARY_PATH=/opt/slam_ws/src/ORB_SLAM3/lib" \
-    --volume "/tmp/.X11-unix:/tmp/.X11-unix:rw" \
-    --volume "${HOST_DATA_DIR}:/data:rw" \
-    --volume "${HOST_DATA_DIR}:/workspace/data:rw" \
-    --volume "${HOST_DATA_DIR}/rtabmap:/root/.ros:rw" \
-    --volume "${HOST_DATA_DIR}/slam_ws:/opt/slam_ws:rw" \
-    --volume "${SCRIPT_DIR}/slam_evaluator:/workspace/slam_evaluator:rw" \
-    --workdir /workspace \
-    "${IMAGE_NAME}" "$@"
+DOCKER_ARGS=(
+    -it --rm
+    --name "${CONTAINER_NAME}"
+    --network host
+    --privileged
+    --ipc host
+    --env "ROS_DOMAIN_ID=${ROS_DOMAIN_ID}"
+    --env "ROS_LOCALHOST_ONLY=${ROS_LOCALHOST_ONLY}"
+    --env "RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION}"
+    --env "DISPLAY=${DISPLAY:-}"
+    --env "QT_QPA_PLATFORM=xcb"
+    --env "XDG_RUNTIME_DIR=/tmp"
+    --env "QT_X11_NO_MITSHM=1"
+    --env "MESA_NO_MITSHM=1"
+    --env "LIBGL_MIT_SHM=0"
+    --env "LD_LIBRARY_PATH=/opt/slam_ws/src/ORB_SLAM3/lib"
+    --volume "/tmp/.X11-unix:/tmp/.X11-unix:rw"
+    --volume "${HOST_DATA_DIR}:/data:rw"
+    --volume "${HOST_DATA_DIR}:/workspace/data:rw"
+    --volume "${HOST_DATA_DIR}/rtabmap:/root/.ros:rw"
+    --volume "${HOST_DATA_DIR}/slam_ws:/opt/slam_ws:rw"
+    --volume "${SCRIPT_DIR}/slam_evaluator:/workspace/slam_evaluator:rw"
+    --workdir /workspace
+)
+
+if command -v nvidia-smi &> /dev/null; then
+    DOCKER_ARGS+=(
+        --runtime=nvidia
+        --gpus all
+        --env "NVIDIA_VISIBLE_DEVICES=all"
+        --env "NVIDIA_DRIVER_CAPABILITIES=all"
+    )
+fi
+
+docker run "${DOCKER_ARGS[@]}" "${IMAGE_NAME}" "$@"
